@@ -12,6 +12,7 @@ import { CarGame } from "./car-game.js";
 export async function mount(
   container: HTMLElement,
   _meta: GameMeta,
+  options: { exitToMenu?: () => void } = {},
 ): Promise<() => void> {
   // Prevent page scrolling while playing
   container.style.overflow = "hidden";
@@ -34,7 +35,7 @@ export async function mount(
   const qualityMode = getQualityMode();
 
   // Create and start the game
-  const game = new CarGame(qualityMode);
+  const game = new CarGame(qualityMode, options.exitToMenu);
   game.start(canvas);
 
   // Handle window resize

@@ -1,38 +1,26 @@
 /**
- * Unified input manager for keyboard and touch controls.
+ * Unified input manager for Tiny Drift Karts.
  *
- * Emits normalized CarInput actions regardless of input device.
- *   steer:    -1 (left) to 1 (right)
- *   throttle:  0 to 1
- *   brake:     0 to 1
- *   drift:     boolean
- *   pause:     boolean (edge-triggered)
- *   restart:   boolean (edge-triggered)
+ * The kart auto-accelerates. Keyboard and touch expose normalized steering
+ * plus a drift action so the game can stay simple on mobile.
  */
 
 import type { CarInput } from "../physics/car-physics.js";
 
-// ---- Keyboard mapping ----
-
 const KEY_MAP: Record<string, keyof RawKeys> = {
-  w: "up",
-  arrowup: "up",
-  s: "down",
-  arrowdown: "down",
   a: "left",
   arrowleft: "left",
   d: "right",
   arrowright: "right",
   " ": "drift",
   space: "drift",
+  shift: "drift",
   p: "pause",
   escape: "pause",
   r: "restart",
 };
 
 interface RawKeys {
-  up: boolean;
-  down: boolean;
   left: boolean;
   right: boolean;
   drift: boolean;
@@ -40,29 +28,17 @@ interface RawKeys {
   restart: boolean;
 }
 
-// ---- Touch state ----
-
 interface TouchState {
-  // Left zone (steering)
   steerActive: boolean;
+  steerStartX: number;
   steerX: number;
-  steerY: number;
   steerId: number | null;
-  // Right zone (buttons)
-  throttleActive: boolean;
-  throttleId: number | null;
-  brakeActive: boolean;
-  brakeId: number | null;
   driftActive: boolean;
   driftId: number | null;
 }
 
-// ---- Controller ----
-
 export class InputManager {
   private rawKeys: RawKeys = {
-    up: false,
-    down: false,
     left: false,
     right: false,
     drift: false,
@@ -72,51 +48,28 @@ export class InputManager {
 
   private touch: TouchState = {
     steerActive: false,
+    steerStartX: 0,
     steerX: 0,
-    steerY: 0,
     steerId: null,
-    throttleActive: false,
-    throttleId: null,
-    brakeActive: false,
-    brakeId: null,
     driftActive: false,
     driftId: null,
   };
 
-  // Edge-triggered events (consumed on read)
   private pauseTriggered = false;
   private restartTriggered = false;
-
   private canvas: HTMLCanvasElement | null = null;
   private canvasRect: DOMRect | null = null;
 
-  private onKeyDown: (e: KeyboardEvent) => void;
-  private onKeyUp: (e: KeyboardEvent) => void;
-  private onTouchStart: (e: TouchEvent) => void;
-  private onTouchMove: (e: TouchEvent) => void;
-  private onTouchEnd: (e: TouchEvent) => void;
-  private onResize: () => void;
+  private onKeyDown = this.handleKeyDown.bind(this);
+  private onKeyUp = this.handleKeyUp.bind(this);
+  private onTouchStart = this.handleTouchStart.bind(this);
+  private onTouchMove = this.handleTouchMove.bind(this);
+  private onTouchEnd = this.handleTouchEnd.bind(this);
+  private onResize = this.handleResize.bind(this);
 
-  // Touch zone definitions (relative to canvas)
-  private leftZoneRight = 0.45; // left 45% = steering
-  private throttleTop = 0.55; // right side, top 45% = throttle button
-  private brakeTop = 0.75; // right side, middle = brake
-  // rest is drift
-
-  constructor() {
-    this.onKeyDown = this.handleKeyDown.bind(this);
-    this.onKeyUp = this.handleKeyUp.bind(this);
-    this.onTouchStart = this.handleTouchStart.bind(this);
-    this.onTouchMove = this.handleTouchMove.bind(this);
-    this.onTouchEnd = this.handleTouchEnd.bind(this);
-    this.onResize = this.handleResize.bind(this);
-  }
-
-  /** Attach event listeners to the canvas. */
   attach(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
     this.canvasRect = canvas.getBoundingClientRect();
-
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
     canvas.addEventListener("touchstart", this.onTouchStart, { passive: false });
@@ -126,7 +79,6 @@ export class InputManager {
     window.addEventListener("resize", this.onResize);
   }
 
-  /** Remove event listeners. */
   detach(): void {
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
@@ -141,136 +93,80 @@ export class InputManager {
     this.canvasRect = null;
   }
 
-  /** Read current input state and consume edge-triggered events. */
   poll(): CarInput & { pause: boolean; restart: boolean } {
-    const keys = this.rawKeys;
-
-    // Keyboard input
     let steer = 0;
-    let throttle = 0;
-    let brake = 0;
+    if (this.rawKeys.left) steer -= 1;
+    if (this.rawKeys.right) steer += 1;
 
-    if (keys.left) steer -= 1;
-    if (keys.right) steer += 1;
-    if (keys.up) throttle = 1;
-    if (keys.down) brake = 1;
-
-    // Touch input (overrides / merges with keyboard)
-    if (this.touch.steerActive) {
-      // Virtual joystick: distance from initial touch gives steer amount
-      // steerX is relative position within steering zone
-      const relX = this.touch.steerX - 0.5; // -0.5 to 0.5
-      steer = Math.max(-1, Math.min(1, relX * 3)); // amplify
+    if (this.touch.steerActive && this.canvasRect) {
+      const dx = this.touch.steerX - this.touch.steerStartX;
+      steer = Math.max(-1, Math.min(1, dx / (this.canvasRect.width * 0.12)));
     }
-    if (this.touch.throttleActive) throttle = 1;
-    if (this.touch.brakeActive) brake = 1;
 
-    const drift = keys.drift || this.touch.driftActive;
-
-    const pause = this.pauseTriggered || keys.pause;
-    const restart = this.restartTriggered || keys.restart;
-
-    // Consume edge triggers
+    const pause = this.pauseTriggered || this.rawKeys.pause;
+    const restart = this.restartTriggered || this.rawKeys.restart;
     this.pauseTriggered = false;
     this.restartTriggered = false;
     this.rawKeys.pause = false;
     this.rawKeys.restart = false;
 
-    return { steer, throttle, brake, drift, pause, restart };
+    return {
+      steer,
+      throttle: 1,
+      brake: 0,
+      drift: this.rawKeys.drift || this.touch.driftActive,
+      pause,
+      restart,
+    };
   }
 
-  // ---- Keyboard handlers ----
+  isActive(): boolean {
+    return (
+      this.rawKeys.left ||
+      this.rawKeys.right ||
+      this.rawKeys.drift ||
+      this.touch.steerActive ||
+      this.touch.driftActive
+    );
+  }
 
   private handleKeyDown(e: KeyboardEvent): void {
-    const key = e.key.toLowerCase();
-    const action = KEY_MAP[key];
+    const action = KEY_MAP[e.key.toLowerCase()];
     if (!action) return;
-
     e.preventDefault();
-
-    if (action === "pause") {
-      this.pauseTriggered = true;
-    } else if (action === "restart") {
-      this.restartTriggered = true;
-    } else {
-      this.rawKeys[action] = true;
-    }
+    if (action === "pause") this.pauseTriggered = true;
+    else if (action === "restart") this.restartTriggered = true;
+    else this.rawKeys[action] = true;
   }
 
   private handleKeyUp(e: KeyboardEvent): void {
-    const key = e.key.toLowerCase();
-    const action = KEY_MAP[key];
+    const action = KEY_MAP[e.key.toLowerCase()];
     if (!action) return;
-
     e.preventDefault();
-
     if (action !== "pause" && action !== "restart") {
       this.rawKeys[action] = false;
     }
   }
 
-  // ---- Touch handlers ----
-
-  private getTouchZone(
-    clientX: number,
-    clientY: number,
-  ): { zone: "steer" | "throttle" | "brake" | "drift"; relX: number; relY: number } {
-    if (!this.canvasRect) {
-      return { zone: "steer", relX: 0, relY: 0 };
-    }
-    const relX = (clientX - this.canvasRect.left) / this.canvasRect.width;
-    const relY = (clientY - this.canvasRect.top) / this.canvasRect.height;
-
-    if (relX < this.leftZoneRight) {
-      return { zone: "steer", relX: relX / this.leftZoneRight, relY };
-    }
-
-    // Right side — vertical zones
-    const rightRelY = relY;
-    if (rightRelY < this.throttleTop) {
-      return { zone: "throttle", relX, relY };
-    }
-    if (rightRelY < this.brakeTop) {
-      return { zone: "brake", relX, relY };
-    }
-    return { zone: "drift", relX, relY };
-  }
-
   private handleTouchStart(e: TouchEvent): void {
     e.preventDefault();
     this.canvasRect = this.canvas?.getBoundingClientRect() ?? null;
+    if (!this.canvasRect) return;
 
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
-      const { zone, relX, relY } = this.getTouchZone(touch.clientX, touch.clientY);
+      const relX = (touch.clientX - this.canvasRect.left) / this.canvasRect.width;
+      const relY = (touch.clientY - this.canvasRect.top) / this.canvasRect.height;
+      const isSteer = relX < 0.48 && relY > 0.45;
 
-      switch (zone) {
-        case "steer":
-          if (this.touch.steerId === null) {
-            this.touch.steerId = touch.identifier;
-            this.touch.steerActive = true;
-            this.touch.steerX = relX;
-            this.touch.steerY = relY;
-          }
-          break;
-        case "throttle":
-          if (this.touch.throttleId === null) {
-            this.touch.throttleId = touch.identifier;
-            this.touch.throttleActive = true;
-          }
-          break;
-        case "brake":
-          if (this.touch.brakeId === null) {
-            this.touch.brakeId = touch.identifier;
-            this.touch.brakeActive = true;
-          }
-          break;
-        case "drift":
-          if (this.touch.driftId === null) {
-            this.touch.driftId = touch.identifier;
-            this.touch.driftActive = true;
-          }
-          break;
+      if (isSteer && this.touch.steerId === null) {
+        this.touch.steerId = touch.identifier;
+        this.touch.steerActive = true;
+        this.touch.steerStartX = touch.clientX;
+        this.touch.steerX = touch.clientX;
+      } else if (!isSteer && relX > 0.52 && relY > 0.45 && this.touch.driftId === null) {
+        this.touch.driftId = touch.identifier;
+        this.touch.driftActive = true;
       }
     }
   }
@@ -278,37 +174,20 @@ export class InputManager {
   private handleTouchMove(e: TouchEvent): void {
     e.preventDefault();
     this.canvasRect = this.canvas?.getBoundingClientRect() ?? null;
-
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
-
       if (touch.identifier === this.touch.steerId) {
-        const { relX, relY } = this.getTouchZone(touch.clientX, touch.clientY);
-        this.touch.steerX = relX;
-        this.touch.steerY = relY;
-        this.touch.steerActive = true;
+        this.touch.steerX = touch.clientX;
       }
     }
   }
 
   private handleTouchEnd(e: TouchEvent): void {
-    this.canvasRect = this.canvas?.getBoundingClientRect() ?? null;
-
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
-
       if (touch.identifier === this.touch.steerId) {
         this.touch.steerId = null;
         this.touch.steerActive = false;
-        this.touch.steerX = 0.5;
-      }
-      if (touch.identifier === this.touch.throttleId) {
-        this.touch.throttleId = null;
-        this.touch.throttleActive = false;
-      }
-      if (touch.identifier === this.touch.brakeId) {
-        this.touch.brakeId = null;
-        this.touch.brakeActive = false;
       }
       if (touch.identifier === this.touch.driftId) {
         this.touch.driftId = null;
@@ -319,18 +198,5 @@ export class InputManager {
 
   private handleResize(): void {
     this.canvasRect = this.canvas?.getBoundingClientRect() ?? null;
-  }
-
-  /** Check if any input is active (for preventing page scroll). */
-  isActive(): boolean {
-    return (
-      this.rawKeys.up ||
-      this.rawKeys.down ||
-      this.rawKeys.left ||
-      this.rawKeys.right ||
-      this.touch.steerActive ||
-      this.touch.throttleActive ||
-      this.touch.brakeActive
-    );
   }
 }

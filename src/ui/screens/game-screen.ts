@@ -2,6 +2,7 @@ import { getGameById, GAME_LOADERS } from "../../app/game-registry.js";
 import { setTopBarStatus, showErrorFallback } from "../../app/app-shell.js";
 import { getGameOfflineStatus } from "../../offline/package-manager.js";
 import { getSWStatus } from "../../pwa/register-sw.js";
+import { navigate } from "../../app/router.js";
 
 /**
  * Game screen — loads and mounts a game module dynamically.
@@ -81,7 +82,9 @@ export async function renderGameScreen(
     // Ensure container is still clear (may have been repurposed)
     container.innerHTML = "";
 
-    const cleanup = await module.mount(container, game);
+    const cleanup = await module.mount(container, game, {
+      exitToMenu: () => navigate("/"),
+    });
 
     // Check again — the mount might have been async too
     if (myGeneration !== loadGeneration) {

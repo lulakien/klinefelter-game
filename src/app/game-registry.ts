@@ -13,9 +13,9 @@ import type { GameMeta } from "../shared/game-types.js";
 const registry: GameMeta[] = [
   {
     id: "car-arena",
-    name: "Drift Arena",
-    description: "Top-down car arena game with drifting and collisions.",
-    version: "0.1.0",
+    name: "Tiny Drift Karts",
+    description: "Bright top-down go-kart lap racing with bots, checkpoints, drift boosts, and touch controls.",
+    version: "0.2.0",
     offlineSupport: "full",
     multiplayerSupport: "none", // singleplayer now, online later
     estimatedSizeLow: 1_500_000, // ~1.5 MB
@@ -25,7 +25,7 @@ const registry: GameMeta[] = [
     controls: ["keyboard", "touch"],
     requiresBackend: false,
     entryModule: "../games/car-arena/index.js",
-    tags: ["singleplayer", "offline", "car", "arcade", "action"],
+    tags: ["singleplayer", "offline", "car", "racing", "arcade", "party"],
   },
   {
     id: "2048",
