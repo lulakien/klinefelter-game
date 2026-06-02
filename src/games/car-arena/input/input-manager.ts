@@ -46,6 +46,18 @@ export interface TinyKartInput extends CarInput {
   aimStrength: number;
 }
 
+export interface TouchDisplayState {
+  steer: {
+    active: boolean;
+    centerX: number;
+    centerY: number;
+    knobX: number;
+    knobY: number;
+    radius: number;
+  };
+  driftActive: boolean;
+}
+
 export class InputManager {
   private rawKeys: RawKeys = {
     left: false,
@@ -179,14 +191,12 @@ export class InputManager {
       const touch = e.changedTouches[i];
       const localX = touch.clientX - this.canvasRect.left;
       const localY = touch.clientY - this.canvasRect.top;
-      const relX = localX / this.canvasRect.width;
-      const relY = localY / this.canvasRect.height;
       const steerCenter = this.getSteerCenter();
       const driftCenter = this.getDriftCenter();
       const steerDist = Math.hypot(localX - steerCenter.x, localY - steerCenter.y);
       const driftDist = Math.hypot(localX - driftCenter.x, localY - driftCenter.y);
-      const isSteer = (relX < 0.5 && relY > 0.42) || steerDist < steerCenter.radius * 1.75;
-      const isDrift = (relX > 0.5 && relY > 0.42) || driftDist < driftCenter.radius * 1.65;
+      const isSteer = steerDist <= steerCenter.radius * 1.2;
+      const isDrift = driftDist <= driftCenter.radius * 1.18;
 
       if (isSteer && this.touch.steerId === null) {
         this.touch.steerId = touch.identifier;
@@ -230,6 +240,37 @@ export class InputManager {
 
   private handleResize(): void {
     this.canvasRect = this.canvas?.getBoundingClientRect() ?? null;
+  }
+
+  getTouchDisplayState(): TouchDisplayState {
+    this.canvasRect = this.canvas?.getBoundingClientRect() ?? this.canvasRect;
+    const steerCenter = this.getSteerCenter();
+    const centerClientX = (this.canvasRect?.left ?? 0) + steerCenter.x;
+    const centerClientY = (this.canvasRect?.top ?? 0) + steerCenter.y;
+    let knobX = steerCenter.x;
+    let knobY = steerCenter.y;
+
+    if (this.touch.steerActive && this.canvasRect) {
+      const dx = this.touch.steerX - centerClientX;
+      const dy = this.touch.steerY - centerClientY;
+      const dist = Math.hypot(dx, dy);
+      const max = steerCenter.radius * 0.78;
+      const scale = dist > max && dist > 0 ? max / dist : 1;
+      knobX = steerCenter.x + dx * scale;
+      knobY = steerCenter.y + dy * scale;
+    }
+
+    return {
+      steer: {
+        active: this.touch.steerActive,
+        centerX: steerCenter.x,
+        centerY: steerCenter.y,
+        knobX,
+        knobY,
+        radius: steerCenter.radius,
+      },
+      driftActive: this.touch.driftActive,
+    };
   }
 
   private getSteerCenter(): { x: number; y: number; radius: number } {

@@ -1014,6 +1014,7 @@ export class CarGame {
   private drawTouchControls(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     const steer = getSteerControl(w, h);
     const drift = getDriftControl(w, h);
+    const touch = this.input.getTouchDisplayState();
     ctx.globalAlpha = 0.42;
     ctx.fillStyle = "rgba(15,23,42,0.28)";
     ctx.strokeStyle = "#ffffff";
@@ -1026,7 +1027,17 @@ export class CarGame {
     ctx.beginPath();
     ctx.arc(steer.x, steer.y, steer.radius * 0.42, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.globalAlpha = touch.steer.active ? 0.92 : 0.58;
+    ctx.fillStyle = touch.steer.active ? "#ffd447" : "rgba(255,255,255,0.7)";
+    ctx.strokeStyle = touch.steer.active ? "#213547" : "rgba(255,255,255,0.75)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(touch.steer.knobX, touch.steer.knobY, Math.max(16, touch.steer.radius * 0.28), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
     ctx.globalAlpha = 0.42;
+    ctx.fillStyle = touch.driftActive ? "rgba(255,212,71,0.58)" : "rgba(15,23,42,0.28)";
+    ctx.strokeStyle = touch.driftActive ? "#ffd447" : "#ffffff";
     ctx.beginPath();
     ctx.arc(drift.x, drift.y, drift.radius, 0, Math.PI * 2);
     ctx.fill();
