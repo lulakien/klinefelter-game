@@ -606,17 +606,18 @@ export class CarGame {
     const ctx = this.ctx;
     const w = this.canvas.width / this.dpr;
     const h = this.canvas.height / this.dpr;
+    const showTouchUi = shouldShowTouchControls();
     ctx.clearRect(0, 0, w, h);
     if (this.phase === "menu") this.drawMenu(ctx, w, h);
     else {
       this.drawRace(ctx, w, h);
       if (this.phase === "countdown") {
         this.drawCountdown(ctx, w, h);
-        this.drawTouchControls(ctx, w, h);
+        if (showTouchUi) this.drawTouchControls(ctx, w, h);
       }
       if (this.phase === "paused") this.drawPauseMenu(ctx, w, h);
       if (this.phase === "results") this.drawResults(ctx, w, h);
-      if (isMobilePortrait(w, h)) this.drawRotateOverlay(ctx, w, h);
+      if (showTouchUi && isMobilePortrait(w, h)) this.drawRotateOverlay(ctx, w, h);
     }
   }
 
@@ -657,10 +658,10 @@ export class CarGame {
 
   private drawMobileMenu(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     const compact = h < 540;
-    const panelX = 14;
-    const panelY = 14;
-    const panelW = w - 28;
-    const panelH = h - 28;
+    const panelX = Math.max(14, w * 0.035);
+    const panelY = compact ? 8 : 14;
+    const panelW = w - panelX * 2;
+    const panelH = h - panelY * 2;
     ctx.fillStyle = "rgba(255,255,255,0.84)";
     roundRect(ctx, panelX, panelY, panelW, panelH, 16);
     ctx.fill();
@@ -670,26 +671,26 @@ export class CarGame {
 
     ctx.fillStyle = "#213547";
     ctx.textAlign = "center";
-    ctx.font = `900 ${compact ? 24 : 30}px system-ui, sans-serif`;
-    ctx.fillText("Tiny Drift Karts", w / 2, panelY + (compact ? 32 : 42));
+    ctx.font = `900 ${compact ? 22 : 30}px system-ui, sans-serif`;
+    ctx.fillText("Tiny Drift Karts", w / 2, panelY + (compact ? 28 : 42));
     ctx.font = `${compact ? 12 : 13}px system-ui, sans-serif`;
     ctx.fillStyle = "rgba(33,53,71,0.72)";
-    ctx.fillText("Pick, race, drift.", w / 2, panelY + (compact ? 50 : 64));
+    ctx.fillText("Pick, race, drift.", w / 2, panelY + (compact ? 45 : 64));
 
     const rowX = panelX + 18;
     const rowW = panelW - 36;
-    const rowGap = compact ? 58 : 68;
-    let y = panelY + (compact ? 66 : 88);
+    const rowGap = compact ? 52 : 68;
+    let y = panelY + (compact ? 58 : 88);
     this.drawPickerRow(ctx, "Course", COURSES[this.selectedCourse].name, "course", rowX, y, rowW);
     y += rowGap;
     this.drawPickerRow(ctx, "Difficulty", DIFFICULTIES[this.selectedDifficulty].name, "difficulty", rowX, y, rowW);
     y += rowGap;
     this.drawPickerRow(ctx, "Kart", KARTS[this.selectedKart].name, "kart", rowX, y, rowW);
 
-    const buttonY = Math.min(y + rowGap, h - 72);
+    const buttonY = Math.min(y + rowGap - (compact ? 4 : 0), h - (compact ? 58 : 72));
     const backW = Math.min(145, (rowW - 12) * 0.42);
-    this.addButton(ctx, "back", "Back", rowX, buttonY, backW, 48, false);
-    this.addButton(ctx, "start", "Start Race", rowX + backW + 12, buttonY, rowW - backW - 12, 48, true);
+    this.addButton(ctx, "back", "Back", rowX, buttonY, backW, compact ? 42 : 48, false);
+    this.addButton(ctx, "start", "Start Race", rowX + backW + 12, buttonY, rowW - backW - 12, compact ? 42 : 48, true);
 
     ctx.fillStyle = "rgba(33,53,71,0.66)";
     ctx.font = "12px system-ui, sans-serif";
@@ -699,17 +700,18 @@ export class CarGame {
 
   private drawPickerRow(ctx: CanvasRenderingContext2D, label: string, value: string, id: string, x: number, y: number, w: number): void {
     ctx.fillStyle = "rgba(33,53,71,0.08)";
-    roundRect(ctx, x, y, w, 56, 10);
+    const rowH = w > 620 ? 48 : 56;
+    roundRect(ctx, x, y, w, rowH, 10);
     ctx.fill();
     ctx.fillStyle = "#213547";
     ctx.textAlign = "left";
     ctx.font = "800 12px system-ui, sans-serif";
-    ctx.fillText(label.toUpperCase(), x + 14, y + 20);
-    ctx.font = "800 18px system-ui, sans-serif";
-    ctx.fillText(value, x + 14, y + 42);
+    ctx.fillText(label.toUpperCase(), x + 14, y + (rowH > 50 ? 20 : 17));
+    ctx.font = `800 ${rowH > 50 ? 18 : 16}px system-ui, sans-serif`;
+    ctx.fillText(value, x + 14, y + (rowH > 50 ? 42 : 37));
     const stepW = 44;
-    this.addButton(ctx, `${id}:prev`, "<", x + w - stepW * 2 - 10, y + 9, stepW, 38, false);
-    this.addButton(ctx, `${id}:next`, ">", x + w - stepW - 6, y + 9, stepW, 38, false);
+    this.addButton(ctx, `${id}:prev`, "<", x + w - stepW * 2 - 10, y + 7, stepW, rowH - 14, false);
+    this.addButton(ctx, `${id}:next`, ">", x + w - stepW - 6, y + 7, stepW, rowH - 14, false);
   }
 
   private drawChoiceColumn(ctx: CanvasRenderingContext2D, title: string, options: string[], selected: number, x: number, y: number, width: number, id: string): void {
@@ -765,7 +767,7 @@ export class CarGame {
     for (const racer of this.getStandings().reverse()) this.drawKart(ctx, racer);
     ctx.restore();
     this.drawHud(ctx, w, h);
-    this.drawTouchControls(ctx, w, h);
+    if (shouldShowTouchControls()) this.drawTouchControls(ctx, w, h);
   }
 
   private drawTrack(ctx: CanvasRenderingContext2D): void {
@@ -1014,7 +1016,7 @@ export class CarGame {
       ctx.fill();
     }
 
-    if (isTouchLayout(w, _h)) {
+    if (shouldShowTouchControls()) {
       this.drawPauseButton(ctx, w);
     }
   }
@@ -1076,6 +1078,12 @@ export class CarGame {
       ctx.lineTo(steer.x + Math.cos(angle) * outer, steer.y + Math.sin(angle) * outer);
       ctx.stroke();
     }
+
+    ctx.fillStyle = "rgba(255,212,71,0.58)";
+    drawChevron(ctx, steer.x, steer.y - steer.radius * 0.63, -Math.PI / 2, 9);
+    drawChevron(ctx, steer.x + steer.radius * 0.63, steer.y, 0, 9);
+    drawChevron(ctx, steer.x, steer.y + steer.radius * 0.63, Math.PI / 2, 9);
+    drawChevron(ctx, steer.x - steer.radius * 0.63, steer.y, Math.PI, 9);
 
     ctx.strokeStyle = "rgba(255,212,71,0.56)";
     ctx.lineWidth = 3;
@@ -1537,6 +1545,20 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.roundRect(x, y, w, h, r);
 }
 
+function drawChevron(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, size: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.beginPath();
+  ctx.moveTo(size, 0);
+  ctx.lineTo(-size * 0.55, -size * 0.72);
+  ctx.lineTo(-size * 0.28, 0);
+  ctx.lineTo(-size * 0.55, size * 0.72);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 function normalize(v: Vec): Vec {
   const len = Math.hypot(v.x, v.y) || 1;
   return { x: v.x / len, y: v.y / len };
@@ -1558,11 +1580,19 @@ function isTouchLayout(width: number, height: number): boolean {
   return width < 900 || height < 560;
 }
 
+function shouldShowTouchControls(): boolean {
+  return (
+    navigator.maxTouchPoints > 0 ||
+    window.matchMedia?.("(pointer: coarse)").matches === true
+  );
+}
+
 function isMobilePortrait(width: number, height: number): boolean {
   return height > width * 1.12 && width < 700;
 }
 
 function getControlReserve(width: number, height: number): number {
+  if (!shouldShowTouchControls()) return 28;
   if (isMobilePortrait(width, height)) return 132;
   if (isTouchLayout(width, height)) return 92;
   return 28;
