@@ -30,8 +30,10 @@ interface RawKeys {
 
 interface TouchState {
   steerActive: boolean;
-  steerStartX: number;
+  steerCenterX: number;
+  steerCenterY: number;
   steerX: number;
+  steerY: number;
   steerId: number | null;
   driftActive: boolean;
   driftId: number | null;
@@ -48,8 +50,10 @@ export class InputManager {
 
   private touch: TouchState = {
     steerActive: false,
-    steerStartX: 0,
+    steerCenterX: 0,
+    steerCenterY: 0,
     steerX: 0,
+    steerY: 0,
     steerId: null,
     driftActive: false,
     driftId: null,
@@ -99,8 +103,9 @@ export class InputManager {
     if (this.rawKeys.right) steer += 1;
 
     if (this.touch.steerActive && this.canvasRect) {
-      const dx = this.touch.steerX - this.touch.steerStartX;
-      steer = Math.max(-1, Math.min(1, dx / (this.canvasRect.width * 0.12)));
+      const radius = Math.max(42, Math.min(78, this.canvasRect.width * 0.16));
+      const dx = this.touch.steerX - this.touch.steerCenterX;
+      steer = Math.max(-1, Math.min(1, dx / radius));
     }
 
     const pause = this.pauseTriggered || this.rawKeys.pause;
@@ -155,16 +160,25 @@ export class InputManager {
 
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
-      const relX = (touch.clientX - this.canvasRect.left) / this.canvasRect.width;
-      const relY = (touch.clientY - this.canvasRect.top) / this.canvasRect.height;
-      const isSteer = relX < 0.48 && relY > 0.45;
+      const localX = touch.clientX - this.canvasRect.left;
+      const localY = touch.clientY - this.canvasRect.top;
+      const relX = localX / this.canvasRect.width;
+      const relY = localY / this.canvasRect.height;
+      const steerCenter = this.getSteerCenter();
+      const driftCenter = this.getDriftCenter();
+      const steerDist = Math.hypot(localX - steerCenter.x, localY - steerCenter.y);
+      const driftDist = Math.hypot(localX - driftCenter.x, localY - driftCenter.y);
+      const isSteer = (relX < 0.5 && relY > 0.42) || steerDist < steerCenter.radius * 1.75;
+      const isDrift = (relX > 0.5 && relY > 0.42) || driftDist < driftCenter.radius * 1.65;
 
       if (isSteer && this.touch.steerId === null) {
         this.touch.steerId = touch.identifier;
         this.touch.steerActive = true;
-        this.touch.steerStartX = touch.clientX;
+        this.touch.steerCenterX = this.canvasRect.left + steerCenter.x;
+        this.touch.steerCenterY = this.canvasRect.top + steerCenter.y;
         this.touch.steerX = touch.clientX;
-      } else if (!isSteer && relX > 0.52 && relY > 0.45 && this.touch.driftId === null) {
+        this.touch.steerY = touch.clientY;
+      } else if (isDrift && this.touch.driftId === null) {
         this.touch.driftId = touch.identifier;
         this.touch.driftActive = true;
       }
@@ -178,6 +192,7 @@ export class InputManager {
       const touch = e.changedTouches[i];
       if (touch.identifier === this.touch.steerId) {
         this.touch.steerX = touch.clientX;
+        this.touch.steerY = touch.clientY;
       }
     }
   }
@@ -198,5 +213,27 @@ export class InputManager {
 
   private handleResize(): void {
     this.canvasRect = this.canvas?.getBoundingClientRect() ?? null;
+  }
+
+  private getSteerCenter(): { x: number; y: number; radius: number } {
+    const rect = this.canvasRect;
+    if (!rect) return { x: 84, y: 84, radius: 52 };
+    const radius = Math.max(46, Math.min(64, rect.width * 0.13));
+    return {
+      x: Math.max(radius + 20, rect.width * 0.16),
+      y: rect.height - radius - 24,
+      radius,
+    };
+  }
+
+  private getDriftCenter(): { x: number; y: number; radius: number } {
+    const rect = this.canvasRect;
+    if (!rect) return { x: 84, y: 84, radius: 52 };
+    const radius = Math.max(48, Math.min(66, rect.width * 0.14));
+    return {
+      x: rect.width - Math.max(radius + 20, rect.width * 0.16),
+      y: rect.height - radius - 24,
+      radius,
+    };
   }
 }

@@ -14,13 +14,21 @@ export async function mount(
   _meta: GameMeta,
   options: { exitToMenu?: () => void } = {},
 ): Promise<() => void> {
+  const previousBodyOverflow = document.body.style.overflow;
+  const previousBodyOverscroll = document.body.style.overscrollBehavior;
+  document.body.style.overflow = "hidden";
+  document.body.style.overscrollBehavior = "none";
+
   // Prevent page scrolling while playing
   container.style.overflow = "hidden";
   container.style.display = "flex";
   container.style.flexDirection = "column";
   container.style.alignItems = "center";
   container.style.justifyContent = "center";
-  container.style.height = "100%";
+  container.style.width = "100vw";
+  container.style.height = "calc(100dvh - 56px)";
+  container.style.minHeight = "320px";
+  container.style.position = "relative";
 
   // Create canvas
   const canvas = document.createElement("canvas");
@@ -56,11 +64,16 @@ export async function mount(
       canvas.parentElement.removeChild(canvas);
     }
     // Reset container styles
+    document.body.style.overflow = previousBodyOverflow;
+    document.body.style.overscrollBehavior = previousBodyOverscroll;
     container.style.overflow = "";
     container.style.display = "";
     container.style.flexDirection = "";
     container.style.alignItems = "";
     container.style.justifyContent = "";
     container.style.height = "";
+    container.style.width = "";
+    container.style.minHeight = "";
+    container.style.position = "";
   };
 }

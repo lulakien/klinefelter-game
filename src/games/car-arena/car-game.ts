@@ -605,6 +605,10 @@ export class CarGame {
     this.buttons = [];
     drawBackground(ctx, w, h, "grass");
     drawMenuTrackPreview(ctx, w, h);
+    if (w < 760 || h < 620) {
+      this.drawMobileMenu(ctx, w, h);
+      return;
+    }
     ctx.fillStyle = "rgba(255,255,255,0.72)";
     roundRect(ctx, Math.max(24, w / 2 - 470), 28, Math.min(940, w - 48), h - 56, 18);
     ctx.fill();
@@ -630,6 +634,61 @@ export class CarGame {
     ctx.fillStyle = "rgba(33,53,71,0.78)";
     ctx.font = "13px system-ui, sans-serif";
     ctx.fillText("Keyboard: A/Left and D/Right steer, Space/Shift drift. Touch: bottom-left joystick, bottom-right drift.", w / 2, h - 22);
+  }
+
+  private drawMobileMenu(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const panelX = 14;
+    const panelY = 14;
+    const panelW = w - 28;
+    const panelH = h - 28;
+    ctx.fillStyle = "rgba(255,255,255,0.84)";
+    roundRect(ctx, panelX, panelY, panelW, panelH, 16);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(33,53,71,0.14)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = "#213547";
+    ctx.textAlign = "center";
+    ctx.font = "900 30px system-ui, sans-serif";
+    ctx.fillText("Tiny Drift Karts", w / 2, panelY + 42);
+    ctx.font = "13px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(33,53,71,0.72)";
+    ctx.fillText("Pick, race, drift.", w / 2, panelY + 64);
+
+    const rowX = panelX + 18;
+    const rowW = panelW - 36;
+    let y = panelY + 88;
+    this.drawPickerRow(ctx, "Course", COURSES[this.selectedCourse].name, "course", rowX, y, rowW);
+    y += 68;
+    this.drawPickerRow(ctx, "Difficulty", DIFFICULTIES[this.selectedDifficulty].name, "difficulty", rowX, y, rowW);
+    y += 68;
+    this.drawPickerRow(ctx, "Kart", KARTS[this.selectedKart].name, "kart", rowX, y, rowW);
+
+    const buttonY = Math.max(y + 74, h - 86);
+    const backW = Math.min(145, (rowW - 12) * 0.42);
+    this.addButton(ctx, "back", "Back", rowX, buttonY, backW, 48, false);
+    this.addButton(ctx, "start", "Start Race", rowX + backW + 12, buttonY, rowW - backW - 12, 48, true);
+
+    ctx.fillStyle = "rgba(33,53,71,0.66)";
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Bottom-left steer. Bottom-right drift.", w / 2, h - 12);
+  }
+
+  private drawPickerRow(ctx: CanvasRenderingContext2D, label: string, value: string, id: string, x: number, y: number, w: number): void {
+    ctx.fillStyle = "rgba(33,53,71,0.08)";
+    roundRect(ctx, x, y, w, 56, 10);
+    ctx.fill();
+    ctx.fillStyle = "#213547";
+    ctx.textAlign = "left";
+    ctx.font = "800 12px system-ui, sans-serif";
+    ctx.fillText(label.toUpperCase(), x + 14, y + 20);
+    ctx.font = "800 18px system-ui, sans-serif";
+    ctx.fillText(value, x + 14, y + 42);
+    const stepW = 44;
+    this.addButton(ctx, `${id}:prev`, "<", x + w - stepW * 2 - 10, y + 9, stepW, 38, false);
+    this.addButton(ctx, `${id}:next`, ">", x + w - stepW - 6, y + 9, stepW, 38, false);
   }
 
   private drawChoiceColumn(ctx: CanvasRenderingContext2D, title: string, options: string[], selected: number, x: number, y: number, width: number, id: string): void {
@@ -669,9 +728,11 @@ export class CarGame {
 
   private drawRace(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     this.buttons = [];
-    const scale = Math.min(w / WORLD_W, (h - 88) / WORLD_H);
+    const hudH = getHudHeight(w);
+    const controlReserve = w < 700 ? 118 : 28;
+    const scale = Math.min(w / WORLD_W, (h - hudH - controlReserve) / WORLD_H);
     const ox = (w - WORLD_W * scale) / 2;
-    const oy = 64 + (h - 88 - WORLD_H * scale) / 2;
+    const oy = hudH + (h - hudH - controlReserve - WORLD_H * scale) / 2;
     drawBackground(ctx, w, h, this.course.theme);
     ctx.save();
     ctx.translate(ox, oy);
@@ -891,25 +952,40 @@ export class CarGame {
   private drawHud(ctx: CanvasRenderingContext2D, w: number, _h: number): void {
     const player = this.racers[0];
     const place = this.getStandings().findIndex((r) => r.id === "player") + 1;
-    const grad = ctx.createLinearGradient(0, 0, 0, 58);
+    const mobile = w < 680;
+    const hudH = getHudHeight(w);
+    const grad = ctx.createLinearGradient(0, 0, 0, hudH);
     grad.addColorStop(0, "rgba(15,23,42,0.94)");
     grad.addColorStop(1, "rgba(30,41,59,0.82)");
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, 58);
+    ctx.fillRect(0, 0, w, hudH);
     ctx.fillStyle = "rgba(255,255,255,0.12)";
-    ctx.fillRect(0, 56, w, 2);
+    ctx.fillRect(0, hudH - 2, w, 2);
     ctx.fillStyle = "#fff";
-    ctx.font = "800 15px system-ui, sans-serif";
+    ctx.font = `800 ${mobile ? 13 : 15}px system-ui, sans-serif`;
     ctx.textBaseline = "middle";
-    ctx.fillText(`Lap ${Math.min(player.lap, this.course.laps)}/${this.course.laps}`, 16, 29);
-    ctx.fillText(`Gate ${player.nextGate === 0 ? "Finish" : `${player.nextGate}/${this.course.gates.length - 1}`}`, 118, 29);
-    ctx.fillStyle = "#ffd447";
-    ctx.fillText(`${placementText(place)}`, 250, 29);
-    ctx.fillStyle = "#fff";
-    ctx.fillText(`${this.course.name} | ${DIFFICULTIES[this.selectedDifficulty].name} | ${player.kart.name}`, 330, 29);
-    ctx.textAlign = "right";
-    ctx.fillText(formatTime(this.raceTime), w - 16, 27);
-    ctx.textAlign = "start";
+    if (mobile) {
+      ctx.fillText(`Lap ${Math.min(player.lap, this.course.laps)}/${this.course.laps}`, 10, 18);
+      ctx.fillText(`Gate ${player.nextGate === 0 ? "Finish" : `${player.nextGate}/${this.course.gates.length - 1}`}`, 86, 18);
+      ctx.fillStyle = "#ffd447";
+      ctx.fillText(`${placementText(place)}`, 178, 18);
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "right";
+      ctx.fillText(formatTime(this.raceTime), w - 10, 18);
+      ctx.textAlign = "start";
+      ctx.font = "800 12px system-ui, sans-serif";
+      ctx.fillText(`${this.course.name} | ${DIFFICULTIES[this.selectedDifficulty].name} | ${player.kart.name}`, 10, 43);
+    } else {
+      ctx.fillText(`Lap ${Math.min(player.lap, this.course.laps)}/${this.course.laps}`, 16, 29);
+      ctx.fillText(`Gate ${player.nextGate === 0 ? "Finish" : `${player.nextGate}/${this.course.gates.length - 1}`}`, 118, 29);
+      ctx.fillStyle = "#ffd447";
+      ctx.fillText(`${placementText(place)}`, 250, 29);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(`${this.course.name} | ${DIFFICULTIES[this.selectedDifficulty].name} | ${player.kart.name}`, 330, 29);
+      ctx.textAlign = "right";
+      ctx.fillText(formatTime(this.raceTime), w - 16, 27);
+      ctx.textAlign = "start";
+    }
 
     if (player.driftCharge > 0 || player.boostTimer > 0) {
       ctx.fillStyle = "rgba(15,23,42,0.34)";
@@ -925,23 +1001,30 @@ export class CarGame {
   }
 
   private drawTouchControls(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const steer = getSteerControl(w, h);
+    const drift = getDriftControl(w, h);
     ctx.globalAlpha = 0.42;
     ctx.fillStyle = "rgba(15,23,42,0.28)";
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(84, h - 86, 46, 0, Math.PI * 2);
+    ctx.arc(steer.x, steer.y, steer.radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+    ctx.globalAlpha = 0.58;
     ctx.beginPath();
-    ctx.arc(w - 86, h - 86, 48, 0, Math.PI * 2);
+    ctx.arc(steer.x, steer.y, steer.radius * 0.42, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.42;
+    ctx.beginPath();
+    ctx.arc(drift.x, drift.y, drift.radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     ctx.globalAlpha = 0.8;
     ctx.fillStyle = "#ffffff";
-    ctx.font = "800 13px system-ui, sans-serif";
+    ctx.font = `800 ${w < 520 ? 12 : 13}px system-ui, sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("DRIFT", w - 86, h - 82);
+    ctx.fillText("DRIFT", drift.x, drift.y + 4);
     ctx.textAlign = "start";
     ctx.globalAlpha = 1;
   }
@@ -1017,6 +1100,12 @@ export class CarGame {
     else if (hit.id === "start" || hit.id === "restart") this.startRace();
     else if (hit.id === "back") this.exitToMenu?.();
     else if (hit.id === "menu") this.phase = "menu";
+    else if (hit.id === "course:prev") this.selectedCourse = wrapIndex(this.selectedCourse - 1, COURSES.length);
+    else if (hit.id === "course:next") this.selectedCourse = wrapIndex(this.selectedCourse + 1, COURSES.length);
+    else if (hit.id === "difficulty:prev") this.selectedDifficulty = wrapIndex(this.selectedDifficulty - 1, DIFFICULTIES.length);
+    else if (hit.id === "difficulty:next") this.selectedDifficulty = wrapIndex(this.selectedDifficulty + 1, DIFFICULTIES.length);
+    else if (hit.id === "kart:prev") this.selectedKart = wrapIndex(this.selectedKart - 1, KARTS.length);
+    else if (hit.id === "kart:next") this.selectedKart = wrapIndex(this.selectedKart + 1, KARTS.length);
     else if (hit.id.startsWith("course:")) this.selectedCourse = Number(hit.id.split(":")[1]);
     else if (hit.id.startsWith("difficulty:")) this.selectedDifficulty = Number(hit.id.split(":")[1]);
     else if (hit.id.startsWith("kart:")) this.selectedKart = Number(hit.id.split(":")[1]);
@@ -1279,6 +1368,32 @@ function normalize(v: Vec): Vec {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function wrapIndex(value: number, length: number): number {
+  return ((value % length) + length) % length;
+}
+
+function getHudHeight(width: number): number {
+  return width < 680 ? 64 : 58;
+}
+
+function getSteerControl(width: number, height: number): { x: number; y: number; radius: number } {
+  const radius = Math.max(46, Math.min(64, width * 0.13));
+  return {
+    x: Math.max(radius + 20, width * 0.16),
+    y: height - radius - 24,
+    radius,
+  };
+}
+
+function getDriftControl(width: number, height: number): { x: number; y: number; radius: number } {
+  const radius = Math.max(48, Math.min(66, width * 0.14));
+  return {
+    x: width - Math.max(radius + 20, width * 0.16),
+    y: height - radius - 24,
+    radius,
+  };
 }
 
 function lerp(a: number, b: number, t: number): number {
