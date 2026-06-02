@@ -22,9 +22,16 @@ export function navigate(path: string): void {
   window.location.hash = path;
 }
 
+/** Extract the URL segments from the current hash. */
+function getUrlSegments(): string[] {
+  const hash = window.location.hash;
+  const raw = hash.replace(/^#\/?/, "") || "/";
+  const [path] = raw.split("?");
+  return path.replace(/\/$/, "").split("/").filter(Boolean);
+}
+
 /** Parse the current hash into a RouteState. */
 function parseHash(hash: string): RouteState {
-  // Remove leading #/ or #
   const raw = hash.replace(/^#\/?/, "") || "/";
   const [path] = raw.split("?");
   const segments = path.replace(/\/$/, "").split("/").filter(Boolean);
@@ -48,38 +55,21 @@ function parseHash(hash: string): RouteState {
   return { route: "home", params: {} };
 }
 
-/** Match a route state against a registered pattern. */
+/** Match a registered pattern against the actual URL segments. */
 function matchPattern(
   pattern: string,
-  state: RouteState,
 ): Record<string, string> | null {
   const patternParts = pattern.replace(/^\//, "").split("/").filter(Boolean);
-  let path: string[];
+  const urlSegments = getUrlSegments();
 
-  switch (state.route) {
-    case "home":
-      path = [];
-      break;
-    case "game":
-      path = ["games", ":gameId"];
-      break;
-    case "settings":
-      path = ["settings"];
-      break;
-    case "offline":
-      path = ["offline"];
-      break;
-    default:
-      return null;
-  }
-
-  if (patternParts.length !== path.length) return null;
+  if (patternParts.length !== urlSegments.length) return null;
 
   const params: Record<string, string> = {};
   for (let i = 0; i < patternParts.length; i++) {
     if (patternParts[i].startsWith(":")) {
-      params[patternParts[i].slice(1)] = path[i];
-    } else if (patternParts[i] !== path[i]) {
+      // Capture URL segment into the named parameter
+      params[patternParts[i].slice(1)] = urlSegments[i];
+    } else if (patternParts[i] !== urlSegments[i]) {
       return null;
     }
   }
@@ -93,7 +83,7 @@ function handleRoute(): void {
   currentState = state;
 
   for (const [pattern, handler] of handlers) {
-    const params = matchPattern(pattern, state);
+    const params = matchPattern(pattern);
     if (params) {
       handler(params);
       return;
@@ -107,7 +97,6 @@ function handleRoute(): void {
 /** Start listening for route changes. */
 export function startRouter(): void {
   window.addEventListener("hashchange", handleRoute);
-  // Handle the initial route
   handleRoute();
 }
 
