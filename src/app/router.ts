@@ -53,7 +53,7 @@ function matchPattern(
   pattern: string,
   state: RouteState,
 ): Record<string, string> | null {
-  const patternParts = pattern.replace(/^\//, "").split("/");
+  const patternParts = pattern.replace(/^\//, "").split("/").filter(Boolean);
   let path: string[];
 
   switch (state.route) {
