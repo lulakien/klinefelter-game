@@ -44,7 +44,6 @@ export async function mount(
   container.style.alignItems = "center";
   container.style.justifyContent = "center";
   container.style.width = "100vw";
-  container.style.minHeight = "320px";
   container.style.position = "relative";
 
   const syncViewportSize = () => {
@@ -114,7 +113,6 @@ export async function mount(
     container.style.justifyContent = "";
     container.style.height = "";
     container.style.width = "";
-    container.style.minHeight = "";
     container.style.position = "";
   };
 }

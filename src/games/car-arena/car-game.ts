@@ -1016,7 +1016,7 @@ export class CarGame {
       ctx.fill();
     }
 
-    if (shouldShowTouchControls()) {
+    if (shouldShowTouchControls() && this.phase === "racing") {
       this.drawPauseButton(ctx, w);
     }
   }
@@ -1115,7 +1115,7 @@ export class CarGame {
     ctx.fillStyle = "rgba(255,255,255,0.82)";
     ctx.font = "900 10px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("STEER", steer.x, steer.y + plateRadius + 16);
+    ctx.fillText("STEER", steer.x, steer.y + steer.radius * 0.58);
 
     ctx.shadowColor = "rgba(15,23,42,0.36)";
     ctx.shadowBlur = 16;
