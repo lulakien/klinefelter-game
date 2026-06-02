@@ -10,6 +10,7 @@ import type { AppSettings, QualityMode } from "../shared/game-types.js";
 const STORAGE_KEY = "klinefelter-settings";
 
 const DEFAULTS: AppSettings = {
+  nickname: "Player",
   qualityMode: "high-quality",
   audioEnabled: true,
   soundEffectsEnabled: true,

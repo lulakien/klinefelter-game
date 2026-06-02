@@ -70,6 +70,7 @@ export interface RouteState {
 // ---- Settings ----
 
 export interface AppSettings {
+  nickname: string;
   qualityMode: QualityMode;
   audioEnabled: boolean;
   soundEffectsEnabled: boolean;

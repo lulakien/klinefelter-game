@@ -3,8 +3,6 @@ import { getSWStatus, onSWStatusChange } from "../../pwa/register-sw.js";
 import { getQualityMode, getSettings } from "../../settings/settings-store.js";
 import {
   getGameOfflineStatus,
-  downloadGame,
-  removeGame,
   downloadAllSingleplayer,
   getStorageEstimate,
   requestPersistence,
@@ -12,8 +10,10 @@ import {
 import {
   formatBytes,
   getStatusBadge,
+  createActionButton,
 } from "../../offline/offline-manager-ui.js";
-import type { GameMeta, GameOfflineStatus } from "../../shared/game-types.js";
+import { setScreenCleanup } from "../../app/app-shell.js";
+import type { GameMeta } from "../../shared/game-types.js";
 
 let unsubSW: (() => void) | null = null;
 
@@ -30,14 +30,22 @@ export function renderOfflineScreen(container: HTMLElement): void {
 
     <section class="offline-section">
       <h2>Connection & App Shell</h2>
-      <p>Connection: <span class="status-badge" id="badge-connection">...</span></p>
-      <p>Service Worker: <span class="status-badge" id="badge-sw">...</span></p>
+      <div class="offline-row">
+        <span>Connection State:</span>
+        <span class="status-badge" id="badge-connection">...</span>
+      </div>
+      <div class="offline-row">
+        <span>Service Worker:</span>
+        <span class="status-badge" id="badge-sw">...</span>
+      </div>
     </section>
 
     <section class="offline-section">
-      <h2>Storage</h2>
-      <p id="storage-estimate">Estimating...</p>
-      <button class="btn btn--small btn--secondary" id="btn-persist" style="display:none;">
+      <h2>Storage Usage</h2>
+      <div id="storage-container">
+        <p id="storage-estimate">Estimating...</p>
+      </div>
+      <button class="btn btn--small btn--secondary" id="btn-persist" style="display:none; margin-top: 12px;">
         Request Persistent Storage
       </button>
     </section>
@@ -57,6 +65,14 @@ export function renderOfflineScreen(container: HTMLElement): void {
 
   // Live status updates
   unsubSW = onSWStatusChange(() => updateConnectionStatus());
+
+  // Register screen cleanup to prevent leaks
+  setScreenCleanup(() => {
+    if (unsubSW) {
+      unsubSW();
+      unsubSW = null;
+    }
+  });
 
   updateConnectionStatus();
   updateStorageInfo();
@@ -90,21 +106,34 @@ function updateConnectionStatus(): void {
 
   // Disable download buttons when offline
   const downloadAllBtn = document.getElementById("btn-download-all") as HTMLButtonElement | null;
-  if (downloadAllBtn && swStatus.offline) {
-    downloadAllBtn.disabled = true;
-    downloadAllBtn.textContent = "Offline — Cannot Download";
+  if (downloadAllBtn) {
+    if (swStatus.offline) {
+      downloadAllBtn.disabled = true;
+      downloadAllBtn.textContent = "Offline — Cannot Download";
+    } else {
+      downloadAllBtn.disabled = false;
+      downloadAllBtn.textContent = "Download All Games";
+    }
   }
 }
 
 async function updateStorageInfo(): Promise<void> {
-  const el = document.getElementById("storage-estimate");
-  if (!el) return;
+  const container = document.getElementById("storage-container");
+  if (!container) return;
 
   const est = await getStorageEstimate();
-  if (est) {
-    el.textContent = `Using ${formatBytes(est.usage)} of ${formatBytes(est.quota)}`;
+  if (est && est.quota > 0) {
+    const percentage = (est.usage / est.quota) * 100;
+    const pctString = percentage < 0.1 && est.usage > 0 ? "< 0.1%" : `${percentage.toFixed(1)}%`;
+    
+    container.innerHTML = `
+      <div class="storage-text">Using <strong>${formatBytes(est.usage)}</strong> of <strong>${formatBytes(est.quota)}</strong> (${pctString})</div>
+      <div class="storage-bar">
+        <div class="storage-bar__fill" style="width: ${percentage}%"></div>
+      </div>
+    `;
   } else {
-    el.textContent = "Storage API not available in this browser.";
+    container.innerHTML = `<p id="storage-estimate">Storage API not available in this browser.</p>`;
   }
 
   // Persistent storage button
@@ -145,13 +174,16 @@ async function renderGameList(): Promise<void> {
   // Download all button
   const downloadAllBtn = document.getElementById("btn-download-all") as HTMLButtonElement | null;
   if (downloadAllBtn) {
-    downloadAllBtn.addEventListener("click", async () => {
+    downloadAllBtn.onclick = async () => {
       downloadAllBtn.disabled = true;
       downloadAllBtn.textContent = "Downloading...";
       const { succeeded, failed } = await downloadAllSingleplayer();
       downloadAllBtn.textContent = `Done: ${succeeded.length} OK, ${failed.length} failed`;
-      setTimeout(() => renderGameList(), 1500);
-    });
+      setTimeout(() => {
+        renderGameList();
+        updateStorageInfo();
+      }, 1500);
+    };
   }
 }
 
@@ -180,67 +212,18 @@ async function createGameRow(game: GameMeta): Promise<HTMLElement> {
     </div>
   `;
 
-  // Add action button
+  // Add action button from the shared UI module helper
   const actionsEl = row.querySelector(`#actions-${game.id}`);
   if (actionsEl) {
-    actionsEl.appendChild(createActionBtn(game, status, () => renderGameList()));
+    actionsEl.appendChild(
+      createActionButton(game, status, () => {
+        renderGameList();
+        updateStorageInfo();
+      })
+    );
   }
 
   return row;
-}
-
-function createActionBtn(
-  game: GameMeta,
-  status: GameOfflineStatus,
-  onRefresh: () => void,
-): HTMLElement {
-  const btn = document.createElement("button");
-  btn.className = "btn btn--small";
-
-  if (status === "online-only") {
-    btn.textContent = "Online only";
-    btn.disabled = true;
-    return btn;
-  }
-
-  if (status === "not-downloaded" || status === "storage-removed" || status === "update-available") {
-    btn.textContent = "Download";
-    btn.addEventListener("click", async () => {
-      btn.textContent = "Downloading...";
-      btn.disabled = true;
-      try {
-        await downloadGame(game.id);
-      } catch {
-        btn.textContent = "Retry";
-        btn.disabled = false;
-        return;
-      }
-      onRefresh();
-    });
-    return btn;
-  }
-
-  if (status === "offline-ready") {
-    btn.textContent = "Remove";
-    btn.className = "btn btn--small btn--secondary";
-    btn.addEventListener("click", async () => {
-      btn.textContent = "Removing...";
-      btn.disabled = true;
-      try {
-        await removeGame(game.id);
-      } catch {
-        btn.textContent = "Error";
-        btn.disabled = false;
-        return;
-      }
-      onRefresh();
-    });
-    return btn;
-  }
-
-  btn.textContent = "—";
-  btn.disabled = true;
-  return btn;
 }
 
 function escapeHtml(text: string): string {

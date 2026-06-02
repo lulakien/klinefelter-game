@@ -8,10 +8,26 @@ export default defineConfig({
   build: {
     target: "ES2022",
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("games/car-arena/")) {
+            return "game-car-arena";
+          }
+          if (id.includes("games/2048/")) {
+            return "game-2048";
+          }
+          if (id.includes("games/minesweeper/")) {
+            return "game-minesweeper";
+          }
+        },
+      },
+    },
   },
   plugins: [
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
+      injectRegister: false,
       // Use generateSW for MVP; switch to injectManifest for per-game cache control later
       workbox: {
         globPatterns: [
@@ -19,8 +35,7 @@ export default defineConfig({
         ],
         // Don't precache game chunks — they're large and should be manually downloaded
         globIgnores: [
-          "**/index-CWOiNG01.js", // car arena game
-          "**/index-dPc33ami.js", // 2048 game
+          "**/game-*.js",
         ],
         runtimeCaching: [
           {
@@ -47,13 +62,13 @@ export default defineConfig({
         orientation: "any",
         icons: [
           {
-            src: "/icons/icon-192.png",
+            src: "icons/icon-192.png",
             sizes: "192x192",
             type: "image/png",
             purpose: "any maskable",
           },
           {
-            src: "/icons/icon-512.png",
+            src: "icons/icon-512.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any maskable",

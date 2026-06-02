@@ -6,6 +6,8 @@
  * Screens render themselves into the shell's content slot.
  */
 
+import { triggerSWUpdate } from "../pwa/register-sw.js";
+
 const APP_SHELL_ID = "app-shell";
 
 let shellEl: HTMLElement | null = null;
@@ -91,4 +93,48 @@ export function showErrorFallback(message: string): void {
   wrap.appendChild(msg);
   wrap.appendChild(btn);
   contentEl.appendChild(wrap);
+}
+
+let activeScreenCleanup: (() => void) | null = null;
+
+/** Register a cleanup function for the active screen. */
+export function setScreenCleanup(cleanup: (() => void) | null): void {
+  triggerScreenCleanup();
+  activeScreenCleanup = cleanup;
+}
+
+/** Run the cleanup function for the active screen. */
+export function triggerScreenCleanup(): void {
+  if (activeScreenCleanup) {
+    try {
+      activeScreenCleanup();
+    } catch (err) {
+      console.error("Error during active screen cleanup:", err);
+    }
+    activeScreenCleanup = null;
+  }
+}
+
+/** Show a floating PWA update notification banner. */
+export function showUpdateBanner(): void {
+  if (document.getElementById("pwa-update-banner")) return;
+
+  const banner = document.createElement("div");
+  banner.id = "pwa-update-banner";
+  banner.className = "pwa-update-banner";
+  banner.innerHTML = `
+    <span>A new update is available with features and fixes!</span>
+    <button class="btn btn--small btn--primary" id="btn-pwa-update">Update Now</button>
+  `;
+
+  document.body.appendChild(banner);
+
+  const btn = banner.querySelector("#btn-pwa-update");
+  if (btn) {
+    btn.addEventListener("click", () => {
+      btn.textContent = "Updating...";
+      (btn as HTMLButtonElement).disabled = true;
+      triggerSWUpdate();
+    });
+  }
 }

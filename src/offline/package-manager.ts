@@ -6,7 +6,7 @@
  */
 
 import type { GameOfflineStatus } from "../shared/game-types.js";
-import { getAllGames } from "../app/game-registry.js";
+import { getAllGames, GAME_LOADERS } from "../app/game-registry.js";
 
 // ---- IndexedDB ----
 
@@ -199,15 +199,7 @@ export async function downloadGame(
   });
 
   try {
-    // Trigger a fetch for the game module — the SW will cache it
-    // We use a dynamic import to load the game, which populates the cache
-    const loaderMap: Record<string, () => Promise<unknown>> = {
-      "car-arena": () => import("../games/car-arena/index.js"),
-      "2048": () => import("../games/2048/index.js"),
-      "minesweeper": () => import("../games/minesweeper/index.js"),
-    };
-
-    const loader = loaderMap[gameId];
+    const loader = GAME_LOADERS[gameId];
     if (!loader) throw new Error(`No loader for game: ${gameId}`);
 
     await loader();

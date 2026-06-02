@@ -5,6 +5,9 @@
  * Supports keyboard (arrow keys) and touch (swipe).
  */
 
+import { playSfx } from "../../app/audio-manager.js";
+import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
+
 // ---- Types ----
 
 interface Tile {
@@ -29,13 +32,13 @@ interface GameState {
   gameOver: boolean;
   won: boolean;
   keepPlaying: boolean;
+  scoreSubmitted: boolean;
 }
 
 // ---- Constants ----
 
 const GRID_SIZE = 4;
 const WIN_VALUE = 2048;
-const BEST_SCORE_KEY = "klinefelter-2048-best";
 
 // ---- Game Logic ----
 
@@ -51,10 +54,11 @@ export function createGame(): GameState {
     grid,
     tiles: [],
     score: 0,
-    bestScore: loadBestScore(),
+    bestScore: getPersonalBest("2048")?.score ?? 0,
     gameOver: false,
     won: false,
     keepPlaying: false,
+    scoreSubmitted: false,
   };
 
   // Spawn two initial tiles
@@ -62,22 +66,6 @@ export function createGame(): GameState {
   spawnTile(state);
 
   return state;
-}
-
-function loadBestScore(): number {
-  try {
-    return parseInt(localStorage.getItem(BEST_SCORE_KEY) ?? "0", 10) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-function saveBestScore(score: number): void {
-  try {
-    localStorage.setItem(BEST_SCORE_KEY, String(score));
-  } catch {
-    // Storage unavailable
-  }
 }
 
 /** Spawn a new tile (90% chance of 2, 10% chance of 4). */
@@ -242,8 +230,15 @@ function hasMovesLeft(state: GameState): boolean {
 function updateBestScore(state: GameState): void {
   if (state.score > state.bestScore) {
     state.bestScore = state.score;
-    saveBestScore(state.bestScore);
   }
+}
+
+function submitScoreIfComplete(state: GameState): void {
+  if (state.scoreSubmitted) return;
+  if (!state.gameOver && !(state.won && !state.keepPlaying)) return;
+
+  saveScore("2048", state.score, state.score.toLocaleString());
+  state.scoreSubmitted = true;
 }
 
 // ---- Direction helpers ----
@@ -361,7 +356,10 @@ export class Game2048Renderer {
     if (dir) {
       e.preventDefault();
       const moved = move(this.state, dir);
-      if (moved) this.render();
+      if (moved) {
+        playSfx("hit");
+        this.render();
+      }
     }
   }
 
@@ -397,12 +395,16 @@ export class Game2048Renderer {
     }
 
     const moved = move(this.state, dir);
-    if (moved) this.render();
+    if (moved) {
+      playSfx("hit");
+      this.render();
+    }
   }
 
   /** Full re-render of the game. */
   render(): void {
     if (!this.container) return;
+    submitScoreIfComplete(this.state);
 
     this.container.innerHTML = `
       <div class="game-2048">
@@ -436,6 +438,12 @@ export class Game2048Renderer {
         ${this.state.won && !this.state.keepPlaying && !this.state.gameOver ? this.renderWin() : ""}
       </div>
     `;
+
+    if (this.state.gameOver) {
+      playSfx("fail");
+    } else if (this.state.won && !this.state.keepPlaying) {
+      playSfx("success");
+    }
 
     // Bind restart button
     document

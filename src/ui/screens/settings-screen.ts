@@ -2,7 +2,7 @@ import { getSettings, updateSettings } from "../../settings/settings-store.js";
 import type { QualityMode } from "../../shared/game-types.js";
 
 /**
- * Settings screen — quality mode, audio, FPS, controls.
+ * Settings screen — profile nickname, quality mode, audio, FPS, controls.
  */
 
 export function renderSettingsScreen(container: HTMLElement): void {
@@ -15,6 +15,14 @@ export function renderSettingsScreen(container: HTMLElement): void {
 
   wrapper.innerHTML = `
     <h1 class="screen-title">Settings</h1>
+
+    <section class="settings-section">
+      <h2>Profile</h2>
+      <label class="setting-row setting-row--stacked">
+        <span class="setting-label">Nickname</span>
+        <input type="text" id="setting-nickname" value="${escapeHtml(settings.nickname)}" placeholder="Player" class="nickname-input" maxlength="24" autocomplete="nickname" />
+      </label>
+    </section>
 
     <section class="settings-section">
       <h2>Quality Mode</h2>
@@ -70,6 +78,15 @@ export function renderSettingsScreen(container: HTMLElement): void {
 }
 
 function bindSettingsEvents(): void {
+  // Nickname input
+  const nicknameInput = document.getElementById("setting-nickname") as HTMLInputElement | null;
+  if (nicknameInput) {
+    // Save on input change (reactive)
+    nicknameInput.addEventListener("input", () => {
+      updateSettings({ nickname: normalizeNickname(nicknameInput.value) });
+    });
+  }
+
   // Quality mode toggle
   const toggleGroup = document.getElementById("quality-toggle");
   if (toggleGroup) {
@@ -104,4 +121,15 @@ function bindCheckbox(id: string, key: string): void {
   el.addEventListener("change", () => {
     updateSettings({ [key]: el.checked });
   });
+}
+
+function escapeHtml(text: string): string {
+  const el = document.createElement("span");
+  el.textContent = text;
+  return el.innerHTML;
+}
+
+function normalizeNickname(value: string): string {
+  const nickname = value.trim().replace(/\s+/g, " ");
+  return nickname || "Player";
 }

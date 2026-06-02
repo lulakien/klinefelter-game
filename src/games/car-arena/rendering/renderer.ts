@@ -67,36 +67,36 @@ interface TireMark {
 // ---- Colors ----
 
 const COLORS = {
-  floor: "#1a1a2e",
-  floorGrid: "#1f2544",
-  wall: "#e94560",
-  wallGlow: "rgba(233, 69, 96, 0.15)",
-  obstacle: "#3a4f7a",
-  obstacleStroke: "#5a6f9a",
-  playerCar: "#4ecca3",
-  playerCarStroke: "#2aac83",
-  botCar: "#f0a500",
-  botCarStroke: "#d09000",
-  botChaser: "#ff4444",
-  botCoward: "#44aaff",
-  botBumper: "#ff8800",
-  token: "#e94560",
-  tokenGlow: "rgba(233, 69, 96, 0.4)",
-  tireMark: "rgba(30, 30, 50, 0.6)",
-  spark: "#ffcc00",
-  smoke: "rgba(150, 150, 160, 0.4)",
-  hudBg: "rgba(0, 0, 0, 0.6)",
+  floor: "#f7a082",
+  floorGrid: "#ef806c",
+  wall: "#694046",
+  wallGlow: "rgba(105, 64, 70, 0.18)",
+  obstacle: "#ffe2d0",
+  obstacleStroke: "#4b3035",
+  playerCar: "#23c7f4",
+  playerCarStroke: "#116c88",
+  botCar: "#ffd529",
+  botCarStroke: "#9a7520",
+  botChaser: "#ff5b5b",
+  botCoward: "#82de47",
+  botBumper: "#ff9c3f",
+  token: "#ffd529",
+  tokenGlow: "rgba(255, 213, 41, 0.45)",
+  tireMark: "rgba(105, 64, 70, 0.26)",
+  spark: "#ffd529",
+  smoke: "rgba(255, 243, 232, 0.55)",
+  hudBg: "rgba(105, 64, 70, 0.88)",
   hudText: "#ffffff",
-  hudAccent: "#e94560",
-  driftBar: "#4ecca3",
-  driftBarBg: "#333",
+  hudAccent: "#ffd529",
+  driftBar: "#23c7f4",
+  driftBarBg: "#ffe2d0",
 };
 
 const BOT_COLORS: Record<string, { body: string; stroke: string }> = {
   wander: { body: COLORS.botCar, stroke: COLORS.botCarStroke },
-  chaser: { body: COLORS.botChaser, stroke: "#cc2222" },
-  coward: { body: COLORS.botCoward, stroke: "#2288cc" },
-  bumper: { body: COLORS.botBumper, stroke: "#cc6600" },
+  chaser: { body: COLORS.botChaser, stroke: "#9f2f34" },
+  coward: { body: COLORS.botCoward, stroke: "#3b7f2f" },
+  bumper: { body: COLORS.botBumper, stroke: "#a95d22" },
 };
 
 // ---- Renderer ----
@@ -200,7 +200,7 @@ export class Renderer {
     const { minX, minY, maxX, maxY } = arena.bounds;
 
     // Floor fill
-    ctx.fillStyle = "#141428";
+    ctx.fillStyle = COLORS.floor;
     ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
 
     // Grid lines (subtle)
@@ -299,17 +299,17 @@ export class Renderer {
       ctx.stroke();
 
       // Windshield
-      ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
       this.fillRoundRect(w / 2 - 10, -h / 2 + 4, 7, h - 8, 3);
       ctx.fill();
 
       // Rear lights
-      ctx.fillStyle = "#ff0000";
+      ctx.fillStyle = "#ff5b5b";
       ctx.fillRect(-w / 2 + 2, -h / 2 + 3, 4, 6);
       ctx.fillRect(-w / 2 + 2, h / 2 - 9, 4, 6);
 
       // Headlights
-      ctx.fillStyle = "#ffffaa";
+      ctx.fillStyle = "#fff3a8";
       ctx.fillRect(w / 2 - 6, -h / 2 + 3, 4, 6);
       ctx.fillRect(w / 2 - 6, h / 2 - 9, 4, 6);
     } else {
@@ -387,7 +387,7 @@ export class Renderer {
       ctx.fill();
 
       // Highlight
-      ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+      ctx.fillStyle = "rgba(255, 243, 232, 0.7)";
       ctx.beginPath();
       ctx.arc(t.x - 2, t.y - 2, r * 0.4, 0, Math.PI * 2);
       ctx.fill();
@@ -559,7 +559,7 @@ export class Renderer {
   private drawPauseOverlay(w: number, h: number): void {
     const ctx = this.ctx;
 
-    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+    ctx.fillStyle = "rgba(105, 64, 70, 0.84)";
     ctx.fillRect(0, 0, w, h);
 
     ctx.fillStyle = "#ffffff";
@@ -569,7 +569,7 @@ export class Renderer {
     ctx.fillText("PAUSED", w / 2, h / 2 - 30);
 
     ctx.font = "16px system-ui, sans-serif";
-    ctx.fillStyle = "#aaa";
+    ctx.fillStyle = "#ffe2d0";
     ctx.fillText("Press P or Esc to resume", w / 2, h / 2 + 20);
     ctx.fillText("Press R to restart", w / 2, h / 2 + 46);
 

@@ -9,13 +9,14 @@
  */
 
 import "./ui/styles/main.css";
-import { mountAppShell, clearContent, getContentElement, setTopBarStatus } from "./app/app-shell.js";
+import { mountAppShell, clearContent, getContentElement, setTopBarStatus, triggerScreenCleanup, showUpdateBanner } from "./app/app-shell.js";
 import { startRouter, on } from "./app/router.js";
 import { registerSW, onSWStatusChange } from "./pwa/register-sw.js";
 import { renderHomeScreen } from "./ui/screens/home-screen.js";
 import { renderSettingsScreen } from "./ui/screens/settings-screen.js";
 import { renderOfflineScreen } from "./ui/screens/offline-screen.js";
 import { renderGameScreen, destroyCurrentGame } from "./ui/screens/game-screen.js";
+import { playSfx } from "./app/audio-manager.js";
 
 // ---- Boot ----
 
@@ -35,6 +36,7 @@ mountAppShell(appContainer);
 
 on("/", () => {
   destroyCurrentGame();
+  triggerScreenCleanup();
   const content = getContentElement();
   clearContent();
   renderHomeScreen(content);
@@ -42,6 +44,7 @@ on("/", () => {
 
 on("/settings", () => {
   destroyCurrentGame();
+  triggerScreenCleanup();
   const content = getContentElement();
   clearContent();
   renderSettingsScreen(content);
@@ -49,6 +52,7 @@ on("/settings", () => {
 
 on("/offline", () => {
   destroyCurrentGame();
+  triggerScreenCleanup();
   const content = getContentElement();
   clearContent();
   renderOfflineScreen(content);
@@ -56,6 +60,7 @@ on("/offline", () => {
 
 on("/games/:gameId", (params) => {
   destroyCurrentGame();
+  triggerScreenCleanup();
   const content = getContentElement();
   clearContent();
   renderGameScreen(content, params.gameId);
@@ -66,14 +71,27 @@ on("/games/:gameId", (params) => {
 onSWStatusChange((status) => {
   if (status.offline) {
     setTopBarStatus("Offline");
-  } else if (status.updated) {
-    setTopBarStatus("Update ready — reload to apply");
   } else {
     setTopBarStatus("");
+  }
+
+  // Display the update banner instead of hijacking control
+  if (status.updated) {
+    showUpdateBanner();
   }
 });
 
 registerSW();
+
+// ---- Global Auditory Feedback ----
+
+document.addEventListener("click", (e) => {
+  const target = e.target as HTMLElement;
+  const clickTarget = target.closest("button, a, .btn, .toggle-btn, .game-card");
+  if (clickTarget && !clickTarget.classList.contains("game-card--disabled")) {
+    playSfx("click");
+  }
+});
 
 // ---- Start ----
 

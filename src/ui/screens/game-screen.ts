@@ -1,6 +1,7 @@
-import { getGameById } from "../../app/game-registry.js";
+import { getGameById, GAME_LOADERS } from "../../app/game-registry.js";
 import { setTopBarStatus, showErrorFallback } from "../../app/app-shell.js";
-import type { GameMeta } from "../../shared/game-types.js";
+import { getGameOfflineStatus } from "../../offline/package-manager.js";
+import { getSWStatus } from "../../pwa/register-sw.js";
 
 /**
  * Game screen — loads and mounts a game module dynamically.
@@ -9,17 +10,6 @@ import type { GameMeta } from "../../shared/game-types.js";
  * after the user has already navigated elsewhere. Every call to
  * renderGameScreen cancels any in-flight load from a previous call.
  */
-
-type MountFn = (
-  container: HTMLElement,
-  meta: GameMeta,
-) => Promise<() => void>;
-
-const GAME_LOADERS: Record<string, () => Promise<{ mount: MountFn }>> = {
-  "car-arena": () => import("../../games/car-arena/index.js"),
-  "2048": () => import("../../games/2048/index.js"),
-  "minesweeper": () => import("../../games/minesweeper/index.js"),
-};
 
 let currentCleanup: (() => void) | null = null;
 let loadGeneration = 0;
@@ -46,6 +36,18 @@ export async function renderGameScreen(
 
   if (!game) {
     showErrorFallback(`Game not found: "${escapeHtml(gameId)}"`);
+    return;
+  }
+
+  // Pre-flight check: block loading if offline and the game package isn't downloaded
+  const status = await getGameOfflineStatus(gameId);
+  const swStatus = getSWStatus();
+
+  if (swStatus.offline && status !== "offline-ready") {
+    showErrorFallback(
+      `"${game.name}" is not downloaded. You must connect to the internet to download and play it.`
+    );
+    setTopBarStatus("");
     return;
   }
 

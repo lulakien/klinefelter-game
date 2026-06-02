@@ -5,6 +5,9 @@
  * Long-press or right-click to flag. First click is always safe.
  */
 
+import { playSfx } from "../../app/audio-manager.js";
+import { saveScore } from "../../settings/scores-store.js";
+
 // ---- Types ----
 
 interface Cell {
@@ -28,6 +31,7 @@ interface GameState {
   won: boolean;
   startTime: number;
   elapsed: number;
+  scoreSubmitted: boolean;
 }
 
 // ---- Constants ----
@@ -70,6 +74,7 @@ export function createGame(
     won: false,
     startTime: 0,
     elapsed: 0,
+    scoreSubmitted: false,
   };
 }
 
@@ -263,6 +268,14 @@ function checkWin(state: GameState): void {
   }
 }
 
+function submitWinningScore(state: GameState): void {
+  if (!state.won || state.scoreSubmitted) return;
+
+  const seconds = Math.max(1, Math.floor(state.elapsed));
+  saveScore("minesweeper", seconds, `${seconds}s`);
+  state.scoreSubmitted = true;
+}
+
 export function getElapsed(state: GameState): number {
   if (!state.started) return 0;
   if (state.gameOver) return state.elapsed;
@@ -321,17 +334,26 @@ export class MinesweeperRenderer {
 
   private handleCellClick(row: number, col: number): void {
     const changed = reveal(this.state, row, col);
-    if (changed) this.render();
+    if (changed) {
+      this.playStateSfx();
+      this.render();
+    }
   }
 
   private handleCellRightClick(row: number, col: number): void {
     const changed = toggleFlag(this.state, row, col);
-    if (changed) this.render();
+    if (changed) {
+      playSfx("hit");
+      this.render();
+    }
   }
 
   private handleCellChord(row: number, col: number): void {
     const changed = chord(this.state, row, col);
-    if (changed) this.render();
+    if (changed) {
+      this.playStateSfx();
+      this.render();
+    }
   }
 
   // Touch: tap = reveal, long-press = flag
@@ -375,6 +397,7 @@ export class MinesweeperRenderer {
 
   render(): void {
     if (!this.container) return;
+    submitWinningScore(this.state);
 
     const { cols, mineCount, flagsPlaced, gameOver, won } = this.state;
     const elapsed = getElapsed(this.state);
@@ -496,6 +519,16 @@ export class MinesweeperRenderer {
           this.handleTouchMove();
         });
       }
+    }
+  }
+
+  private playStateSfx(): void {
+    if (this.state.won) {
+      playSfx("success");
+    } else if (this.state.gameOver) {
+      playSfx("fail");
+    } else {
+      playSfx("hit");
     }
   }
 

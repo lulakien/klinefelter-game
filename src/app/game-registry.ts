@@ -77,3 +77,10 @@ export function getGameSize(game: GameMeta, qualityMode: string): number {
     ? game.estimatedSizeLow
     : game.estimatedSizeHigh;
 }
+
+/** Dynamic game loader map with chunk names. */
+export const GAME_LOADERS: Record<string, () => Promise<any>> = {
+  "car-arena": () => import(/* viteChunkName: "game-car-arena" */ "../games/car-arena/index.js"),
+  "2048": () => import(/* viteChunkName: "game-2048" */ "../games/2048/index.js"),
+  "minesweeper": () => import(/* viteChunkName: "game-minesweeper" */ "../games/minesweeper/index.js"),
+};

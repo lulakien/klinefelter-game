@@ -22,13 +22,17 @@ import { createCamera, updateCamera } from "./rendering/camera.js";
 import type { BotState, BotType } from "./bots/bot.js";
 import { createBot, updateBot } from "./bots/bot.js";
 import { createDefaultArena, type Arena, type TokenSpawn } from "./arena.js";
+import { playSfx } from "../../app/audio-manager.js";
+import { saveScore } from "../../settings/scores-store.js";
 import {
   createScoreState,
   updateScoring,
   collectToken,
   bumpBot,
+  nearMiss,
   updateDriftChain,
   getFinalScore,
+  formatScore,
 } from "./scoring.js";
 
 // ---- Game Config ----
@@ -66,6 +70,7 @@ export class CarGame {
   private running = false;
   private phase: GamePhase = "countdown";
   private countdownTimer = 3;
+  private scoreSubmitted = false;
 
   // Quality
   private renderQuality: RenderQuality;
@@ -73,6 +78,8 @@ export class CarGame {
   // Near miss tracking
   private lastBotDistances: number[] = [];
   private nearMissCooldown = 0;
+  private impactSfxCooldown = 0;
+  private driftSfxCooldown = 0;
 
   constructor(qualityMode: "ultra-low" | "high-quality") {
     this.input = new InputManager();
@@ -256,15 +263,27 @@ export class CarGame {
     // Check round end
     if (!this.scoreState.roundActive) {
       this.phase = "round-over";
+      this.submitFinalScore();
+      playSfx("success");
       return;
     }
 
     // Update drift chain
     updateDriftChain(this.scoreState, this.playerCar);
+    if (this.scoreState.driftChainMultiplier > 1.15 && this.driftSfxCooldown <= 0) {
+      playSfx("drift");
+      this.driftSfxCooldown = 0.75;
+    }
 
     // Update near miss cooldown
     if (this.nearMissCooldown > 0) {
       this.nearMissCooldown -= dt;
+    }
+    if (this.impactSfxCooldown > 0) {
+      this.impactSfxCooldown -= dt;
+    }
+    if (this.driftSfxCooldown > 0) {
+      this.driftSfxCooldown -= dt;
     }
 
     // Player collision with arena
@@ -280,6 +299,7 @@ export class CarGame {
     );
     if (playerImpact > 100 && this.renderer) {
       this.renderer.spawnSparks(this.playerCar.x, this.playerCar.y, 5);
+      this.playImpactSfx();
     }
 
     // Update bots
@@ -315,6 +335,7 @@ export class CarGame {
 
         if (relSpeed > BOT_BUMP_SPEED) {
           bumpBot(this.scoreState);
+          this.playImpactSfx();
           if (this.renderer) {
             const midX = (this.playerCar.x + bot.car.x) / 2;
             const midY = (this.playerCar.y + bot.car.y) / 2;
@@ -337,7 +358,7 @@ export class CarGame {
           dist < 70 &&
           prevDist > 30
         ) {
-          this.scoreState.nearMisses++;
+          nearMiss(this.scoreState);
           this.nearMissCooldown = 1.0; // don't spam near misses
         }
         this.lastBotDistances[i] = dist;
@@ -365,6 +386,7 @@ export class CarGame {
       if (dist < TOKEN_COLLECT_RADIUS) {
         this.activeTokens.delete(idx);
         collectToken(this.scoreState);
+        playSfx("success");
 
         // Spawn a small particle burst
         if (this.renderer) {
@@ -416,6 +438,7 @@ export class CarGame {
 
     // Scoring
     this.scoreState = createScoreState(ROUND_DURATION);
+    this.scoreSubmitted = false;
 
     // Loop
     this.accumulator = 0;
@@ -426,6 +449,23 @@ export class CarGame {
     // Tracking
     this.lastBotDistances = this.bots.map(() => Infinity);
     this.nearMissCooldown = 0;
+    this.impactSfxCooldown = 0;
+    this.driftSfxCooldown = 0;
+  }
+
+  private submitFinalScore(): void {
+    if (this.scoreSubmitted) return;
+
+    const finalScore = getFinalScore(this.scoreState);
+    saveScore("car-arena", finalScore, formatScore(finalScore));
+    this.scoreSubmitted = true;
+  }
+
+  private playImpactSfx(): void {
+    if (this.impactSfxCooldown > 0) return;
+
+    playSfx("hit");
+    this.impactSfxCooldown = 0.2;
   }
 
   // ---- Countdown & Round Over rendering ----
