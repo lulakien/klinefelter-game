@@ -12,19 +12,10 @@ import "./ui/styles/main.css";
 import { mountAppShell, clearContent, getContentElement, setTopBarStatus } from "./app/app-shell.js";
 import { startRouter, on } from "./app/router.js";
 import { registerSW, onSWStatusChange } from "./pwa/register-sw.js";
-import {
-  renderHomeScreen,
-} from "./ui/screens/home-screen.js";
-import {
-  renderSettingsScreen,
-} from "./ui/screens/settings-screen.js";
-import {
-  renderOfflineScreen,
-} from "./ui/screens/offline-screen.js";
-import {
-  renderGameScreen,
-  pauseCurrentGame,
-} from "./ui/screens/game-screen.js";
+import { renderHomeScreen } from "./ui/screens/home-screen.js";
+import { renderSettingsScreen } from "./ui/screens/settings-screen.js";
+import { renderOfflineScreen } from "./ui/screens/offline-screen.js";
+import { renderGameScreen, destroyCurrentGame } from "./ui/screens/game-screen.js";
 
 // ---- Boot ----
 
@@ -34,37 +25,37 @@ if (!appContainer) {
   throw new Error("Fatal: #app element not found in DOM.");
 }
 
-// Mount the shared app shell (top bar + content area)
 mountAppShell(appContainer);
 
 // ---- Route handlers ----
+// IMPORTANT: destroyCurrentGame() must be called BEFORE clearContent()
+// so the running game is stopped and its resources freed before the DOM
+// is modified. The game route handler also calls it, but doing it here
+// ensures the game is dead before any screen transition.
 
-// Home route: game launcher
 on("/", () => {
-  pauseCurrentGame();
+  destroyCurrentGame();
   const content = getContentElement();
   clearContent();
   renderHomeScreen(content);
 });
 
-// Settings route
 on("/settings", () => {
-  pauseCurrentGame();
+  destroyCurrentGame();
   const content = getContentElement();
   clearContent();
   renderSettingsScreen(content);
 });
 
-// Offline manager route
 on("/offline", () => {
-  pauseCurrentGame();
+  destroyCurrentGame();
   const content = getContentElement();
   clearContent();
   renderOfflineScreen(content);
 });
 
-// Game routes: /games/:gameId
 on("/games/:gameId", (params) => {
+  destroyCurrentGame();
   const content = getContentElement();
   clearContent();
   renderGameScreen(content, params.gameId);
@@ -72,7 +63,6 @@ on("/games/:gameId", (params) => {
 
 // ---- PWA ----
 
-// Listen for online/offline status
 onSWStatusChange((status) => {
   if (status.offline) {
     setTopBarStatus("Offline");
@@ -83,10 +73,8 @@ onSWStatusChange((status) => {
   }
 });
 
-// Register service worker for offline support
 registerSW();
 
 // ---- Start ----
 
-// Begin listening for hash changes and fire the initial route
 startRouter();

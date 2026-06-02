@@ -44,10 +44,17 @@ export async function mount(
   // Return cleanup function
   return () => {
     window.removeEventListener("resize", onResize);
-    game.destroy();
+    // Always stop the game loop, even if other cleanup fails
+    try {
+      game.destroy();
+    } catch (err) {
+      console.error("Error destroying car game:", err);
+    }
+    // Always remove canvas, even if destroy threw
     if (canvas.parentElement) {
       canvas.parentElement.removeChild(canvas);
     }
+    // Reset container styles
     container.style.overflow = "";
     container.style.display = "";
     container.style.flexDirection = "";
