@@ -1,0 +1,2933 @@
+# 1. Project overview
+
+## What this project is
+
+This should be designed as a **personal, mobile-first, offline-first mini game portal** on your own domain.
+
+The strongest version of the idea is:
+
+> A tiny private web arcade for you and your friends: fast to open, cheap on data, installable like an app, playable offline, and gradually expandable from simple solo games to friend-only online rooms.
+
+The core product is not the number of games. The core product is the **experience**:
+
+* open your domain on mobile;
+* see a clean game launcher;
+* download selected games for offline use;
+* play singleplayer games later without internet;
+* use simple same-device multiplayer when together;
+* eventually create private online rooms with room codes.
+
+A Progressive Web App is the right mental model. Service workers are specifically designed to sit between the app, browser, and network, intercept requests, and enable offline experiences. The Cache API and IndexedDB are the key browser storage tools you would use for cached game files and local metadata. ([MDN Web Docs][1])
+
+## What this project is not
+
+This is **not** a public commercial game platform.
+
+It is not:
+
+* an ad-supported game portal;
+* a SaaS product;
+* a social network;
+* a scalable public multiplayer service;
+* an SEO content site;
+* a payment/subscription platform;
+* an analytics-heavy growth funnel;
+* a Unity/WebGL showcase;
+* a general “upload any game” marketplace.
+
+That matters because it changes nearly every technical decision. You can avoid large systems that would be normal for a commercial product but unnecessary here.
+
+## What should be avoided
+
+Because this is personal-use, avoid:
+
+* account systems in the MVP;
+* payments;
+* ads;
+* analytics SDKs;
+* external CDNs;
+* external fonts;
+* large UI libraries unless truly needed;
+* Unity WebGL for the first version;
+* a database before online rooms require it;
+* leaderboards before the games are fun;
+* user profiles before you have a reason;
+* SEO pages;
+* admin dashboards;
+* public moderation tools;
+* complicated matchmaking;
+* heavy art pipelines;
+* premature real-time multiplayer.
+
+The best first version should feel more like a **polished private toy box** than a platform.
+
+---
+
+# 2. Product vision
+
+## Positioning
+
+Position the site as:
+
+> A low-data, offline-ready, friend-only mini game hub.
+
+The emotional goal is simple: your friends should think, “This is a small website, but it feels surprisingly good.”
+
+The practical goal is:
+
+* works on weak internet;
+* does not waste mobile data;
+* can be installed to the home screen;
+* keeps downloaded games playable offline;
+* feels clean and cheerful;
+* does not behave like a bloated modern website.
+
+## Strengthening the “low-data personal mini game portal” idea
+
+Make low-data usage a visible feature, not just an implementation detail.
+
+Good product language:
+
+* “Download once, play offline.”
+* “Ultra Low Mode available.”
+* “No ads. No trackers. No external scripts.”
+* “This game is 1.2 MB.”
+* “Offline ready.”
+* “Update available.”
+* “Remove from offline storage.”
+* “Works without internet after download.”
+
+The site should show estimated game sizes before download. A game card might say:
+
+> **Drift Arena**
+> Top-down car arena game
+> Offline: Yes
+> Size: 1.8 MB low / 4.5 MB high
+> Controls: Touch + keyboard
+> Status: Not downloaded
+
+That makes the portal feel intentional.
+
+## Main user scenarios
+
+### Scenario A: Downloading games at home on Wi-Fi
+
+The user opens the site while connected to Wi-Fi.
+
+They see:
+
+* home page;
+* game list;
+* install prompt or home-screen instructions;
+* offline status;
+* “Download selected games”;
+* “Download all singleplayer games.”
+
+They choose:
+
+* Ultra Low Mode or High Quality Mode;
+* one or more games to save offline.
+
+The service worker caches the app shell and selected game packages. Game status changes from **Not downloaded** to **Offline ready**.
+
+### Scenario B: Playing offline on a plane
+
+A few days later, the user opens the PWA shortcut in airplane mode.
+
+Expected behavior:
+
+* home page opens;
+* downloaded games are playable;
+* undownloaded games are shown but disabled or marked “Needs internet”;
+* online rooms are shown as unavailable;
+* the app does not repeatedly try to call the network;
+* the app clearly says “Offline mode.”
+
+This is achievable, but you should design with one caveat: browser storage is generally reliable but not an absolute permanent guarantee. Browsers and operating systems can evict site storage under storage pressure, and storage behavior differs by browser. You can request persistent storage, but browsers may or may not grant it. ([MDN Web Docs][2])
+
+### Scenario C: Playing same-device games with friends
+
+This is a great intermediate step before online multiplayer.
+
+Examples:
+
+* pass-and-play backgammon;
+* same-phone checkers;
+* shared-tablet card games;
+* local reaction games;
+* 2-player arena mini game on one screen;
+* party games where players pass the phone.
+
+No backend is required. No network is required. Data use is zero after download.
+
+### Scenario D: Creating online rooms with friends
+
+Later, online rooms can support:
+
+* room code creation;
+* private lobbies;
+* Werewolf/Vampire Village;
+* turn-based board games;
+* maybe online car arena.
+
+For turn-based or social games, this is very manageable. For real-time online car gameplay, it is much harder because you need latency handling, prediction, reconciliation, authoritative simulation, and cheating/fairness decisions.
+
+---
+
+# 3. Technical architecture recommendation
+
+## Recommended frontend stack
+
+Use:
+
+* **Vite**
+* **TypeScript**
+* **Vanilla TypeScript for the core app**
+* **Canvas for real-time games**
+* **CSS/SVG/HTML for UI and board/card games**
+* **Service Worker + Cache API + IndexedDB**
+* **optional Workbox through `vite-plugin-pwa`**
+* **no external runtime CDN dependencies**
+* **self-hosted fonts only if needed, but preferably system fonts**
+
+Vite is a good fit because it builds static assets suitable for static hosting, and it supports modern bundling/code-splitting patterns. Vite’s production build creates a static `dist` output that can be served by normal static hosting. ([vitejs][3])
+
+## Is Vite + TypeScript a good choice?
+
+Yes. It is probably the best default choice for this project.
+
+Reasons:
+
+* fast local development;
+* small static output;
+* easy TypeScript setup;
+* good support for dynamic imports;
+* good PWA plugin ecosystem;
+* no need for a large framework;
+* works well with Canvas games;
+* deploys easily to static hosting.
+
+The important architectural point is to make every game a separate lazy-loaded module. The home page should not download the car game, card game, backgammon logic, and future Werewolf UI all at once.
+
+## React or Vanilla TypeScript?
+
+My clearest recommendation:
+
+> Start with **Vanilla TypeScript**, not React.
+
+Use React only if the UI becomes complex enough to justify it.
+
+Why Vanilla TypeScript fits better here:
+
+* smaller initial bundle;
+* fewer dependencies;
+* easier offline packaging;
+* less framework overhead;
+* easier to keep game code separate from UI code;
+* better alignment with Canvas-based games;
+* easier to audit data usage.
+
+The site’s UI is not complex enough at first to require React. You need:
+
+* home screen;
+* game cards;
+* settings screen;
+* offline manager screen;
+* game shell;
+* modals;
+* buttons;
+* status badges.
+
+That can be built cleanly with TypeScript modules and small reusable UI functions.
+
+A reasonable compromise is:
+
+* MVP: Vanilla TypeScript.
+* Later: consider **Preact** if UI complexity grows.
+* Avoid React in the first version unless you personally strongly prefer it.
+
+## Where Canvas should be used
+
+Use Canvas for:
+
+* top-down car game;
+* Snake;
+* real-time arcade games;
+* football/tactical mini game if animated;
+* particle effects;
+* games with continuous movement;
+* games needing custom rendering loops.
+
+Canvas is especially appropriate for the car game because you need continuous rendering, camera movement, arena drawing, particles, collision visualization, and fast frame updates.
+
+## Where CSS/SVG should be used
+
+Use CSS/SVG/HTML for:
+
+* home page;
+* settings;
+* game cards;
+* offline status;
+* buttons;
+* menus;
+* card games;
+* checkers;
+* backgammon;
+* Minesweeper;
+* 2048;
+* Memory;
+* Werewolf/Vampire Village UI.
+
+SVG is great for scalable board pieces, cards, icons, dice, checkers, and simple decorative shapes. CSS is enough for many simple board games and keeps data usage low.
+
+## When a Node/WebSocket backend is needed
+
+You do **not** need a backend for:
+
+* home page;
+* singleplayer games;
+* offline downloads;
+* same-device multiplayer;
+* local settings;
+* local scores;
+* PWA installability.
+
+You need a backend when you add:
+
+* online room creation;
+* WebSocket rooms;
+* private social deduction games;
+* online turn-based board games;
+* synchronized multiplayer state;
+* reconnect handling;
+* persistent room state;
+* player identity beyond local nickname.
+
+The browser WebSocket API supports two-way communication between browser and server without HTTP polling, which makes it the normal choice for live rooms and multiplayer. ([MDN Web Docs][4])
+
+## When a database is needed
+
+You do **not** need a database for the MVP.
+
+You may need a database later for:
+
+* saved room history;
+* player nicknames;
+* persistent friend list;
+* long-running Werewolf games;
+* saved match results;
+* moderation logs, if the group grows;
+* server restart recovery;
+* leaderboards, if you ever add them.
+
+For personal use, start without accounts. Use local nicknames and room codes.
+
+## Static hosting and backend separation
+
+Use this separation:
+
+```text
+yourdomain.com
+  Static PWA: home page, game shell, singleplayer games, assets
+
+api.yourdomain.com or yourdomain.com/api
+  Future API: room creation, room metadata, health checks
+
+ws.yourdomain.com or yourdomain.com/ws
+  Future WebSocket endpoint: online rooms and multiplayer
+```
+
+Best initial setup:
+
+* static site only;
+* no backend;
+* no database.
+
+Later setup:
+
+* static frontend on Cloudflare Pages, Netlify, Vercel, GitHub Pages, or similar;
+* small backend on Cloudflare Workers/Durable Objects, Fly.io, Render, Railway, or a small VPS.
+
+For room-based WebSocket games, Cloudflare Durable Objects are a strong fit because a single object can coordinate multiple clients in the same room. Cloudflare’s own docs describe Durable Objects as useful for coordinating WebSocket connections for chat rooms and multiplayer-like cases. ([Cloudflare Docs][5])
+
+---
+
+# 4. Game architecture
+
+## Loading each game as a separate module/route
+
+Each game should live as its own module.
+
+Example routes:
+
+```text
+/
+  Home / game launcher
+
+/games/car-arena
+  Top-down car game
+
+/games/2048
+  2048
+
+/games/minesweeper
+  Minesweeper
+
+/games/backgammon
+  Backgammon
+
+/games/werewolf
+  Future online room game
+```
+
+The home page should load only:
+
+* app shell;
+* UI components;
+* game metadata;
+* settings;
+* offline status logic.
+
+When the user taps a game:
+
+1. router opens the game route;
+2. app checks whether the game module is already available;
+3. if online and not cached, it loads the module;
+4. if offline and cached, it loads from Cache API;
+5. if offline and not cached, it shows “Not downloaded.”
+
+## Shared game shell
+
+Every game should run inside a shared shell:
+
+* top bar;
+* pause/menu button;
+* quality mode indicator;
+* offline status;
+* fullscreen-style layout;
+* orientation warning if needed;
+* settings shortcut;
+* exit-to-home button;
+* error fallback;
+* loading screen.
+
+The shell should know how to:
+
+* mount a game;
+* unmount a game;
+* pause/resume a game;
+* pass settings;
+* pass input events;
+* clean up timers/listeners;
+* show loading and offline states.
+
+## Shared settings system
+
+Global settings should include:
+
+* quality mode: Ultra Low / High Quality;
+* audio enabled;
+* sound effects enabled;
+* music enabled;
+* reduced motion;
+* target FPS preference;
+* touch control style;
+* left/right-handed controls;
+* vibration enabled, where supported;
+* manual update checks only;
+* allow network in background: on/off;
+* display data usage estimates.
+
+Store settings locally in IndexedDB or localStorage. IndexedDB is better for structured app state and offline metadata; localStorage is fine for a small settings mirror, but do not rely on it for game packages. IndexedDB is designed for larger structured browser data. ([MDN Web Docs][6])
+
+## Shared asset loader
+
+The asset loader should understand:
+
+* game ID;
+* version;
+* quality mode;
+* required files;
+* optional files;
+* estimated size;
+* cache status;
+* progress events;
+* fallback assets.
+
+Asset categories:
+
+```text
+core
+  App shell assets needed for home/offline launch
+
+game-required
+  Files required to run a specific game
+
+game-low
+  Ultra Low Mode assets
+
+game-high
+  High Quality Mode assets
+
+optional-audio
+  Music and sound files
+
+optional-polish
+  extra particles, backgrounds, animations
+```
+
+The loader should never silently download high-quality optional assets in Ultra Low Mode.
+
+## Shared input system
+
+Create one input layer that supports:
+
+* keyboard;
+* touch buttons;
+* virtual joystick;
+* pointer events;
+* gamepad later, optional;
+* same-device multiplayer profiles.
+
+For the car game:
+
+* keyboard maps to steering/throttle/brake/drift;
+* touch maps to joystick/buttons;
+* input system emits normalized actions, not raw DOM events.
+
+Example normalized input:
+
+```text
+steer: -1 to 1
+throttle: 0 to 1
+brake: 0 to 1
+drift: true/false
+pause: true/false
+```
+
+Do not let each game invent its own input handling from scratch.
+
+## Shared audio system
+
+Audio should be optional and mode-aware.
+
+Rules:
+
+* Ultra Low Mode: audio off by default.
+* High Quality Mode: sound effects allowed, music optional.
+* No autoplay assumptions.
+* Load audio only after user interaction.
+* Do not preload music on the home page.
+* Prefer tiny sound effects.
+* Consider generated/simple Web Audio effects for small games.
+
+Audio should be a service:
+
+```text
+audio.playSfx("click")
+audio.playSfx("crash")
+audio.setEnabled(false)
+audio.setMode("ultra-low")
+```
+
+## Shared offline cache system
+
+The offline system should manage:
+
+* app shell cache;
+* game package cache;
+* per-game status;
+* per-game versions;
+* update availability;
+* removal;
+* storage estimate;
+* download progress.
+
+Use:
+
+* Service Worker for request interception and offline fallback;
+* Cache API for static files and game assets;
+* IndexedDB for metadata: installed packages, versions, timestamps, settings, local scores.
+
+## Per-game metadata
+
+Every game should define metadata like this conceptually:
+
+```text
+id: car-arena
+name: Drift Arena
+description: Top-down car arena game with drifting and collisions.
+offlineSupport: full
+multiplayerSupport: singleplayer-now, online-later
+estimatedSize:
+  low: 1.5 MB
+  high: 4.5 MB
+qualityModes:
+  ultraLow: true
+  highQuality: true
+controls:
+  keyboard: true
+  touch: true
+  sameDevice: false
+```
+
+Suggested metadata fields:
+
+| Field                 | Purpose                                                       |
+| --------------------- | ------------------------------------------------------------- |
+| `id`                  | Stable internal identifier                                    |
+| `name`                | Display name                                                  |
+| `description`         | Short user-facing description                                 |
+| `version`             | Game package version                                          |
+| `offlineSupport`      | `none`, `partial`, or `full`                                  |
+| `multiplayerSupport`  | `none`, `same-device`, `online-turn-based`, `online-realtime` |
+| `estimatedSizeLow`    | Low-quality package size                                      |
+| `estimatedSizeHigh`   | High-quality package size                                     |
+| `supportsUltraLow`    | Whether Ultra Low Mode is supported                           |
+| `supportsHighQuality` | Whether High Quality Mode is supported                        |
+| `controls`            | Keyboard, touch, same-device, gamepad                         |
+| `requiresBackend`     | Whether the game needs a server                               |
+| `cacheGroup`          | Cache namespace                                               |
+| `entryModule`         | Lazy-loaded module path                                       |
+| `assetManifest`       | Asset package manifest path                                   |
+| `tags`                | Singleplayer, offline, board, car, party, etc.                |
+
+---
+
+# 5. Data usage analysis
+
+## Is 20–30 MB per 15-minute session realistic?
+
+Yes, for the project as described.
+
+It is very realistic for:
+
+* singleplayer games;
+* offline games after download;
+* board games;
+* card games;
+* social deduction games;
+* turn-based online games.
+
+It is also realistic for a real-time online car game **if** you design the network protocol carefully.
+
+It becomes risky if you use:
+
+* large game engines;
+* uncompressed art/audio;
+* streaming music;
+* external trackers;
+* large React/UI bundles;
+* repeated cache-busting;
+* naive JSON snapshots 20–60 times per second;
+* automatic update checks that redownload files.
+
+## How data usage works for singleplayer games
+
+Singleplayer data usage has two phases.
+
+### First download
+
+The user downloads:
+
+* app shell;
+* game module;
+* assets;
+* optional audio/assets depending on quality mode.
+
+This might be 500 KB to 6 MB per game if controlled well.
+
+### Later gameplay
+
+If the game is cached correctly, data usage during gameplay is basically:
+
+* 0 MB if offline;
+* near 0 MB if online but no update check runs;
+* a small amount if you manually check for updates.
+
+For your goal, singleplayer games should be treated as **download once, replay many times**.
+
+## How data usage works for turn-based online games
+
+Turn-based online games are extremely data-friendly.
+
+A move can be tiny:
+
+```text
+player A moved checker from point 13 to point 8
+player B drew card
+player C voted for player D
+```
+
+Even with JSON and WebSocket overhead, this is small. A 15-minute session of Werewolf/Vampire Village or backgammon can easily stay under 1 MB to a few MB, unless you add voice, images, avatars, or chat spam.
+
+## How data usage can be controlled in a real-time online car game
+
+Real-time car multiplayer is harder, but the data budget can still be controlled.
+
+Use:
+
+* client sends input, not full state;
+* server runs authoritative simulation;
+* server sends compact snapshots;
+* lower tick rate in Ultra Low Mode;
+* delta compression;
+* binary messages eventually;
+* interest management if maps grow;
+* no voice chat;
+* no automatic replay upload;
+* no constant telemetry.
+
+Example:
+
+* Ultra Low online car mode: 10 server updates/sec.
+* High Quality online car mode: 20 server updates/sec.
+* Client sends steering/throttle/brake/drift input.
+* Server sends positions/velocities/rotations for nearby cars.
+
+For a friend-only game with 2–6 players, a carefully designed protocol can stay under 20–30 MB per 15 minutes. A naive protocol can exceed it quickly.
+
+## What unnecessarily increases data usage
+
+Avoid:
+
+* loading all games on first visit;
+* loading both low and high assets;
+* music files in default downloads;
+* third-party analytics;
+* third-party fonts;
+* external CSS libraries;
+* big UI frameworks for a tiny UI;
+* heavy physics engines;
+* Unity WebGL builds;
+* large PNG backgrounds;
+* unoptimized sprites;
+* source maps in production;
+* sending full game state every frame;
+* polling HTTP endpoints every second;
+* auto-checking for updates on every page load;
+* cache-busting filenames without actual changes;
+* redownloading unchanged game packages.
+
+## How to preserve visual quality while keeping data low
+
+Use:
+
+* flat colors;
+* SVG icons;
+* procedural Canvas shapes;
+* small sprite atlases;
+* CSS gradients;
+* particle systems generated in code;
+* reusable geometric assets;
+* system fonts;
+* limited but strong color palette;
+* simple animations;
+* strong spacing and button design;
+* good hit targets;
+* tasteful transitions.
+
+Polish does not require large assets. For casual games, polish mostly comes from:
+
+* responsiveness;
+* animation timing;
+* satisfying controls;
+* consistent colors;
+* clean typography;
+* sound effects, optional;
+* good feedback when something happens.
+
+## Example data budget table
+
+These are practical targets, not hard guarantees.
+
+| Area                         | First load / package target | 15-min session target after cached | Notes                                  |
+| ---------------------------- | --------------------------: | ---------------------------------: | -------------------------------------- |
+| Home page, Ultra Low         |                  150–400 KB |                           0–100 KB | App shell only, no game code           |
+| Home page, High Quality      |               400 KB–1.2 MB |                           0–200 KB | More icons/animations allowed          |
+| Car game, low quality        |                 800 KB–2 MB |                       0 MB offline | Canvas shapes, minimal audio           |
+| Car game, high quality       |                      2–6 MB |                       0 MB offline | Extra particles, sprites, optional SFX |
+| 2048 / Minesweeper / Snake   |                  100–600 KB |                       0 MB offline | Mostly CSS/Canvas code                 |
+| Memory card game             |               300 KB–1.5 MB |                       0 MB offline | Depends on card art                    |
+| Solitaire / card game        |               300 KB–1.5 MB |                       0 MB offline | SVG cards recommended                  |
+| Backgammon                   |               300 KB–1.2 MB |                       0 MB offline | CSS/SVG board and pieces               |
+| Checkers                     |                  200–800 KB |                       0 MB offline | Simple board UI                        |
+| Werewolf/Vampire Village     |                 500 KB–2 MB |                 100 KB–2 MB online | Event-based WebSocket messages         |
+| Online turn-based board game |                 500 KB–2 MB |                 100 KB–3 MB online | Depends on chat frequency              |
+| Online car mode, optimized   |              2–6 MB package |                     2–15 MB online | Needs efficient sync                   |
+| Online car mode, naive       |             2–10 MB package |                   20–80+ MB online | Too much JSON/full-state sync          |
+
+---
+
+# 6. Offline-first/PWA design
+
+## Service Worker strategy
+
+Use the service worker as the app’s offline traffic controller.
+
+A service worker can intercept navigation and resource requests and decide whether to respond from cache, network, or a fallback. ([MDN Web Docs][1])
+
+Use a custom service worker strategy, preferably with Workbox’s building blocks. Workbox supports common strategies like cache-first, network-first, and stale-while-revalidate, and `vite-plugin-pwa` can integrate Workbox into a Vite project. ([Chrome for Developers][7])
+
+For this project, I would use `injectManifest` rather than fully automatic service worker generation once the offline package system becomes important. The reason is control: you need manual game downloads, per-game cache status, quality-mode asset selection, and careful update behavior.
+
+## Cache-first, network-first, stale-while-revalidate
+
+### Cache-first
+
+Try cache first. If missing, fetch from network.
+
+Use for:
+
+* downloaded game files;
+* hashed JS/CSS assets;
+* images;
+* SVG;
+* audio;
+* game packages.
+
+This minimizes data usage and works well offline.
+
+### Network-first
+
+Try network first. If unavailable, fall back to cache.
+
+Use for:
+
+* online room state;
+* update manifest checks, but only when manually triggered;
+* backend health checks;
+* multiplayer APIs.
+
+This is good when freshness matters.
+
+### Stale-while-revalidate
+
+Return cached version immediately, then update cache in background.
+
+Use carefully.
+
+Good for:
+
+* non-critical metadata;
+* game catalog when online;
+* maybe home-page metadata.
+
+Avoid using it aggressively in Ultra Low Mode because it still makes network requests. Workbox’s stale-while-revalidate strategy returns cached content quickly but also updates from the network in the background. ([Chrome for Developers][7])
+
+## Recommended strategy by resource
+
+| Resource                | Strategy                      | Reason                                   |
+| ----------------------- | ----------------------------- | ---------------------------------------- |
+| App shell HTML          | Cache with controlled update  | Needed offline, but updates must be safe |
+| Core JS/CSS with hashes | Cache-first                   | Stable, content-addressed                |
+| Game modules            | Cache-first after download    | Avoid redownloads                        |
+| Game assets             | Cache-first                   | Best for low data                        |
+| Optional music          | Do not cache unless requested | Avoid wasting storage/data               |
+| Game package manifest   | Manual network check          | Avoid automatic traffic                  |
+| Online room API         | Network-first / network-only  | Must be fresh                            |
+| WebSocket               | Network-only                  | No offline equivalent                    |
+| Local scores/settings   | IndexedDB                     | Local structured state                   |
+| Offline status metadata | IndexedDB                     | Persistent app state                     |
+
+## Offline game package system
+
+Each game should have an asset manifest.
+
+Conceptually:
+
+```text
+car-arena package v1.0.0
+  required:
+    /games/car-arena/index.[hash].js
+    /games/car-arena/car-physics.[hash].js
+    /games/car-arena/assets/arena-low.[hash].json
+
+  low:
+    /games/car-arena/assets/sprites-low.[hash].webp
+
+  high:
+    /games/car-arena/assets/sprites-high.[hash].webp
+    /games/car-arena/assets/particles-high.[hash].json
+
+  optionalAudio:
+    /games/car-arena/audio/crash.[hash].ogg
+    /games/car-arena/audio/skid.[hash].ogg
+```
+
+The app should download only the selected package:
+
+* Ultra Low Mode package;
+* High Quality package;
+* optional audio package only if enabled.
+
+Store package install metadata in IndexedDB:
+
+```text
+gameId
+installedVersion
+qualityInstalled
+installedAt
+sizeBytes
+assetUrls
+status
+lastUpdateCheck
+```
+
+## “Download all singleplayer games for offline use”
+
+This button should:
+
+1. ask for confirmation;
+2. show estimated total size;
+3. request persistent storage if available;
+4. iterate through all games with `offlineSupport: full`;
+5. download low or high packages based on current setting;
+6. show progress per game;
+7. stop gracefully if offline or storage fails;
+8. mark successful games as Offline ready;
+9. show failed games separately.
+
+Do not include:
+
+* online-only games;
+* optional music by default;
+* high-quality assets unless High Quality Mode is selected.
+
+## Per-game caching
+
+Each game card should have actions:
+
+* Play;
+* Download for offline;
+* Download high-quality assets;
+* Check for update;
+* Remove from offline storage.
+
+Game status examples:
+
+| Status           | Meaning                         |
+| ---------------- | ------------------------------- |
+| Not downloaded   | Game needs internet to load     |
+| Offline ready    | Required package is cached      |
+| Partial download | Some files failed               |
+| Update available | New version exists              |
+| Needs update     | Cached version incompatible     |
+| Online only      | Cannot work offline             |
+| Storage removed  | Browser/OS likely evicted files |
+
+## Cache versioning
+
+Use:
+
+* hashed filenames for built assets;
+* package manifest version per game;
+* app shell version;
+* cache namespace per release;
+* IndexedDB installed package table.
+
+Example cache names:
+
+```text
+app-shell-v3
+game-car-arena-v1.0.0-low
+game-car-arena-v1.0.0-high
+game-2048-v1.0.0
+```
+
+Update flow:
+
+1. User taps “Check for updates.”
+2. App fetches latest package manifest.
+3. App compares versions.
+4. If newer package exists, show “Update available.”
+5. User taps “Update.”
+6. New package downloads completely.
+7. App verifies all required files.
+8. App switches installed version.
+9. Old package is deleted.
+
+Never delete the old offline game before the new one is fully downloaded.
+
+## Offline status shown to the user
+
+At minimum:
+
+* global status: Online / Offline;
+* storage estimate;
+* app shell status;
+* per-game offline status;
+* last update check;
+* “manual update checks only” note;
+* warning if browser storage persistence is not granted.
+
+Use `navigator.storage.estimate()` where available to show approximate storage usage/quota. WebKit added full Storage API support in Safari 17.0 for estimating usage/quota, but storage behavior still varies by browser. ([WebKit][8])
+
+## Airplane mode scenario, step by step
+
+The desired flow:
+
+1. User opens the site at home on Wi-Fi.
+2. Site loads the app shell.
+3. Service worker installs.
+4. App shell is cached.
+5. User chooses Ultra Low or High Quality Mode.
+6. User downloads Car Arena for offline.
+7. App downloads required game module and selected assets.
+8. App stores package status in IndexedDB.
+9. Game card shows **Offline ready**.
+10. User closes the app.
+11. Days later, user enables airplane mode.
+12. User opens home-screen PWA shortcut or browser page.
+13. Service worker serves app shell from cache.
+14. Home page reads IndexedDB offline metadata.
+15. Downloaded games show **Offline ready**.
+16. User taps Car Arena.
+17. Game module and assets load from cache.
+18. Game plays without network.
+19. Online rooms are disabled with a clear message.
+
+On iPhone, users can add a website to the Home Screen from Safari and open it like an app; however, custom install prompt behavior such as `beforeinstallprompt` is non-standard and mainly Chromium-based, so the app should provide manual iOS instructions rather than relying on one universal install button. ([Apple Support][9])
+
+---
+
+# 7. Ultra Low Mode / High Quality Mode design
+
+## Settings screen
+
+The settings screen should be simple and visible from the home page and game pause menu.
+
+Suggested layout:
+
+```text
+Settings
+
+Quality Mode
+[ Ultra Low ] [ High Quality ]
+
+Data & Offline
+- Manual update checks only: On
+- Download audio with games: Off
+- Show estimated file sizes: On
+
+Performance
+- Target FPS: 30 in Ultra Low / 60 in High Quality
+- Reduced particles: On in Ultra Low
+- Reduced animations: On in Ultra Low
+
+Audio
+- Sound effects: Off / On
+- Music: Off / On
+
+Controls
+- Touch layout: Left steering / Right steering
+- Keyboard controls: enabled
+- Vibration: Off / On
+```
+
+## What the setting should change
+
+| Area              | Ultra Low Mode         | High Quality Mode        |
+| ----------------- | ---------------------- | ------------------------ |
+| Initial downloads | Minimum required files | Better assets allowed    |
+| Music             | Not loaded             | Optional                 |
+| Sound effects     | Off by default         | Optional/on              |
+| FPS target        | 30 FPS acceptable      | 60 FPS target            |
+| Particles         | Minimal                | More effects             |
+| Shadows/glow      | Off or simple          | Allowed                  |
+| Animations        | Short/simple           | More polished            |
+| Sprite resolution | Low                    | Higher                   |
+| Network updates   | Reduced/manual         | Normal, still controlled |
+| Online tick rate  | Lower                  | Higher                   |
+| Cache updates     | Manual only            | Manual or prompted       |
+| Data display      | Always visible         | Visible in settings      |
+
+The game loop should still use `requestAnimationFrame`; browser animation callbacks generally align with the display refresh rate, so your own loop should decide whether to render every frame or intentionally skip renders for a 30 FPS target. ([MDN Web Docs][10])
+
+## Asset selection
+
+Each game should define asset variants:
+
+```text
+requiredBase
+lowQuality
+highQuality
+optionalAudio
+optionalCosmetic
+```
+
+Ultra Low download:
+
+```text
+requiredBase + lowQuality
+```
+
+High Quality download:
+
+```text
+requiredBase + highQuality
+```
+
+High Quality with audio:
+
+```text
+requiredBase + highQuality + optionalAudio
+```
+
+Important rule:
+
+> High Quality Mode should never accidentally become “download everything forever.”
+
+It should still have budgets.
+
+## FPS targets
+
+For most games:
+
+* Ultra Low: 30 FPS render target.
+* High Quality: 60 FPS render target.
+
+For board/card games:
+
+* FPS target matters less.
+* Render only on state changes.
+* Avoid continuous animation loops when idle.
+
+For the car game:
+
+* Physics update can use a fixed timestep.
+* Rendering can be 30 or 60 depending on mode.
+* Low mode can reduce particles and background details.
+
+## Audio, visuals, particles, and network behavior
+
+### Audio
+
+Ultra Low:
+
+* no music;
+* no preloaded sound effects;
+* sound effects off by default;
+* optional small UI click sound only if user enables.
+
+High Quality:
+
+* sound effects allowed;
+* small music loops optional;
+* still lazy-loaded;
+* never loaded from home page.
+
+### Visuals
+
+Ultra Low:
+
+* flat background;
+* simple car shapes;
+* fewer trails;
+* no expensive blur/shadow;
+* fewer animated UI effects.
+
+High Quality:
+
+* tire marks;
+* dust/smoke;
+* impact sparks;
+* animated menu transitions;
+* better arena decoration;
+* small sprite details.
+
+### Network
+
+Ultra Low:
+
+* no automatic update check on launch;
+* lower WebSocket heartbeat frequency where safe;
+* lower real-time snapshot rate;
+* no cosmetic downloads;
+* no telemetry.
+
+High Quality:
+
+* normal manual update checks;
+* richer online state if needed;
+* still no analytics or uncontrolled background traffic.
+
+## Developer rules so modes do not break over time
+
+Add project rules:
+
+1. Every new asset must be tagged as required, low, high, optional audio, or optional cosmetic.
+2. Every game must declare estimated low and high package sizes.
+3. Every game must work with audio disabled.
+4. Every game must work in Ultra Low Mode.
+5. Home page must not import game modules directly.
+6. No new third-party runtime package without a size reason.
+7. No external CDN dependencies.
+8. No auto-updating game package in Ultra Low Mode.
+9. Production source maps should not be publicly downloaded by users.
+10. Bundle size checks should fail or warn when budgets are exceeded.
+
+---
+
+# 8. Detailed car game design
+
+## What the MVP car game should be
+
+Build a small game called something like:
+
+> **Drift Arena**
+
+MVP concept:
+
+* top-down 2D arena;
+* one player car;
+* touch and keyboard controls;
+* simple bots or targets;
+* timed rounds;
+* drifting;
+* wall collisions;
+* score based on survival, collecting, bumping bots, or drift chains.
+
+Do not start with racing tracks, online multiplayer, upgrades, car customization, or complex AI.
+
+A good MVP mode:
+
+> Drive around a compact arena, collect glowing tokens, avoid or bump simple bot cars, chain drifts for bonus points, and survive for 90 seconds.
+
+This gives you:
+
+* driving feel;
+* scoring;
+* replayability;
+* collision testing;
+* mobile controls;
+* room for visual polish;
+* no backend.
+
+## Camera angle
+
+Use a **top-down camera**.
+
+Options:
+
+1. **Fixed arena camera**
+   Good for very small arenas and same-device play.
+
+2. **Follow camera**
+   Better for singleplayer car feel.
+
+Recommendation for MVP:
+
+* follow camera for mobile;
+* keep arena small;
+* add soft camera smoothing;
+* do not rotate the camera;
+* car rotates, camera does not.
+
+A non-rotating camera is easier for mobile controls and reduces motion discomfort.
+
+## Map/arena type
+
+MVP arena:
+
+* rectangular or rounded rectangle boundary;
+* a few obstacles;
+* painted floor zones;
+* boost pads later;
+* walls with bounce;
+* no large tile map;
+* no scrolling world larger than necessary.
+
+Good first arena:
+
+```text
+Size: around 2000 x 1400 virtual units
+Objects:
+- outer walls
+- 5–10 circular/rectangular obstacles
+- token spawn points
+- 2–4 simple bot cars or moving hazards
+```
+
+Keep it readable on a phone screen.
+
+## Car control model
+
+Use arcade physics, not realistic simulation.
+
+State:
+
+```text
+position
+velocity
+rotation
+angularVelocity
+throttle
+brake
+steer
+driftButton
+```
+
+Core feel:
+
+* throttle accelerates forward;
+* steering turns more when moving;
+* friction slows the car;
+* lateral friction controls sliding;
+* drift button reduces lateral grip;
+* collision bounces car away;
+* short speed boost possible later.
+
+Driving should be “toy-like but satisfying,” not realistic.
+
+## Keyboard controls
+
+Default:
+
+| Action            | Key             |
+| ----------------- | --------------- |
+| Accelerate        | W / Arrow Up    |
+| Brake / reverse   | S / Arrow Down  |
+| Steer left        | A / Arrow Left  |
+| Steer right       | D / Arrow Right |
+| Drift / handbrake | Space           |
+| Pause             | Esc / P         |
+| Restart           | R               |
+
+## Mobile touch controls
+
+Offer two touch layouts.
+
+### Layout A: Two-zone arcade controls
+
+Left side:
+
+* steering pad or virtual joystick.
+
+Right side:
+
+* throttle button;
+* brake button;
+* drift button.
+
+This is familiar for mobile driving games.
+
+### Layout B: One-thumb casual mode
+
+* car auto-accelerates;
+* drag left/right to steer;
+* tap/hold for drift.
+
+This is better for casual players.
+
+Recommendation:
+
+* MVP includes Layout A.
+* Add Layout B after the car feels good.
+
+## Simple bot logic
+
+Bots should be simple.
+
+Bot types:
+
+1. **Wander bot**
+   Drives toward random waypoints.
+
+2. **Chaser bot**
+   Slowly follows player.
+
+3. **Coward bot**
+   Runs away from player.
+
+4. **Bumper bot**
+   Attempts to hit player.
+
+MVP bot logic:
+
+```text
+choose target point
+steer toward target
+slow down near walls
+avoid obstacles with simple ray checks
+if stuck, reverse briefly
+```
+
+Do not build pathfinding first. Use simple steering behaviors.
+
+## Collision system
+
+Start simple.
+
+Recommended MVP collision:
+
+* cars as circles or capsules;
+* obstacles as circles/rectangles;
+* walls as axis-aligned boundaries;
+* collision response: push apart + damp velocity;
+* impact strength used for sound/particles.
+
+You can draw the car as a rectangle while colliding as a circle/capsule. That is acceptable for a casual game and much easier.
+
+Later you can improve to oriented rectangles if needed.
+
+## Drift/driving feel
+
+The feel comes from tuning, not complexity.
+
+Key tuning parameters:
+
+```text
+acceleration
+maxSpeed
+brakeForce
+turnRate
+grip
+driftGrip
+angularDamping
+linearDamping
+collisionBounce
+```
+
+A simple drift model:
+
+* decompose velocity into forward and sideways components;
+* keep forward velocity mostly intact;
+* reduce sideways velocity based on grip;
+* when drifting, reduce grip so sideways motion persists longer;
+* spawn tire smoke/trails when sideways speed is high.
+
+High Quality Mode can show tire marks and smoke. Ultra Low Mode can show only a short skid line or nothing.
+
+## Scoring system
+
+Use a scoring system that rewards fun behavior.
+
+MVP scoring options:
+
+* +10 for token collected;
+* +25 for bumping bot;
+* +1 per second survived;
+* drift chain multiplier;
+* bonus for near misses;
+* penalty for hitting walls, optional.
+
+Best MVP scoring:
+
+```text
+Score = tokens + drift chain + bot bumps
+Round length = 90 seconds
+```
+
+This creates a short mobile-friendly session.
+
+## Game loop
+
+Use:
+
+* fixed timestep for physics;
+* requestAnimationFrame for render;
+* separate update and draw;
+* pause when tab hidden;
+* scale canvas for device pixel ratio but cap it in Ultra Low Mode.
+
+Conceptual loop:
+
+```text
+read input
+accumulate time
+while accumulated time >= fixedStep:
+  update physics
+  update bots
+  resolve collisions
+  update score
+render interpolated frame
+```
+
+MVP fixed physics step:
+
+* 60 updates/sec internally;
+* render 30 FPS in Ultra Low;
+* render up to 60 FPS in High Quality.
+
+## Low Quality vs High Quality differences
+
+| Feature            | Ultra Low            | High Quality          |
+| ------------------ | -------------------- | --------------------- |
+| Render target      | 30 FPS               | 60 FPS                |
+| Device pixel ratio | capped               | higher cap            |
+| Car art            | simple Canvas shapes | better sprites/shapes |
+| Arena              | flat colors          | extra decals          |
+| Particles          | minimal              | smoke, sparks, dust   |
+| Tire marks         | off or very short    | visible fading trails |
+| Audio              | off by default       | optional SFX          |
+| Camera shake       | off or tiny          | light impact shake    |
+| Shadows            | none/simple          | simple blob shadows   |
+| Bot count          | lower default        | more allowed          |
+
+## What should absolutely not be included in the first version
+
+Do not include:
+
+* online multiplayer;
+* accounts;
+* car upgrades;
+* garage/customization;
+* large campaign;
+* multiple tracks;
+* level editor;
+* complex AI pathfinding;
+* realistic physics engine;
+* destructible terrain;
+* large music files;
+* 3D rendering;
+* Unity WebGL;
+* public leaderboard;
+* replay system;
+* chat;
+* matchmaking.
+
+The first version should prove:
+
+* controls feel good;
+* game is fun for 1–3 minutes;
+* mobile works;
+* offline works;
+* data usage is low.
+
+## How online multiplayer could be added later
+
+Later architecture:
+
+* client sends input commands;
+* server owns authoritative simulation;
+* server broadcasts snapshots;
+* clients predict their own car locally;
+* clients interpolate other cars;
+* server handles collisions and scoring;
+* room code maps players to one match.
+
+Ultra Low online mode:
+
+* 10 Hz snapshots;
+* fewer particles;
+* no cosmetic state;
+* compact messages.
+
+High Quality online mode:
+
+* 20 Hz snapshots;
+* more interpolation;
+* richer effects locally.
+
+Do not attempt this until the offline car game feels good.
+
+---
+
+# 9. Multiplayer strategy
+
+## Same-device multiplayer
+
+Same-device multiplayer should come before online real-time multiplayer.
+
+Good candidates:
+
+* checkers;
+* backgammon;
+* pass-and-play card games;
+* same-device reaction games;
+* local 2-player arena game on tablet;
+* party voting games.
+
+Benefits:
+
+* no backend;
+* no latency;
+* no data use;
+* easy offline support;
+* good for friend groups in person.
+
+Design considerations:
+
+* clear turn indicator;
+* large touch targets;
+* “pass device” screen for hidden information;
+* optional player names/colors;
+* pause/resume state saved locally.
+
+## Online turn-based multiplayer
+
+Online turn-based games are the best first backend use case.
+
+Examples:
+
+* checkers;
+* backgammon;
+* card games;
+* asynchronous 2048 challenge;
+* simple tactical football game.
+
+Architecture:
+
+* room code;
+* server stores game state;
+* clients send moves;
+* server validates moves;
+* server broadcasts events;
+* reconnect reads current room state.
+
+Data usage is tiny because the game syncs events, not continuous simulation.
+
+## Online real-time multiplayer
+
+Use later for:
+
+* car arena;
+* real-time action games;
+* live same-screen style games over network.
+
+Architecture:
+
+* WebSocket connection;
+* authoritative room server;
+* input messages from clients;
+* server simulation tick;
+* snapshot broadcasts;
+* client prediction;
+* interpolation;
+* reconnect handling.
+
+This is significantly more difficult than turn-based multiplayer.
+
+## Room system for Werewolf/Vampire Village
+
+This is a very good first online room game because it is event-based.
+
+Core room flow:
+
+1. Host creates room.
+2. App generates short room code.
+3. Friends join with code.
+4. Players choose names.
+5. Host starts game.
+6. Server assigns roles privately.
+7. Game alternates night/day phases.
+8. Players perform actions.
+9. Server reveals allowed public results.
+10. Game ends and shows summary.
+
+Important:
+
+* role info must be server-controlled;
+* clients should not receive hidden roles/actions they should not see;
+* reconnect should restore each player’s private view;
+* host disconnect should not destroy the room immediately.
+
+## WebSocket architecture
+
+For friend-only rooms, use native WebSocket messages.
+
+Do not start with Socket.IO unless you specifically need its fallback transports and extra features. Native WebSocket is enough for controlled modern browsers and keeps overhead lower.
+
+Message types:
+
+```text
+join_room
+leave_room
+player_ready
+start_game
+submit_action
+chat_message
+phase_changed
+state_patch
+player_disconnected
+reconnect
+```
+
+For Cloudflare-style architecture:
+
+```text
+Static PWA
+  served from yourdomain.com
+
+Worker endpoint
+  handles /api/create-room and /ws
+
+Durable Object per room
+  owns room state and connected sockets
+```
+
+For Node-style architecture:
+
+```text
+Static PWA
+  served from static hosting
+
+Node server
+  Express/Fastify + ws
+  room manager in memory
+  optional database later
+```
+
+Render’s docs describe a common Node pattern of extending an HTTP server with WebSocket support using `ws`, while Cloudflare recommends Durable Objects when an app needs coordination among multiple WebSocket connections. ([Render][11])
+
+## Room code system
+
+Use short room codes:
+
+```text
+ABCD
+7KQ2
+MARS
+```
+
+For personal use:
+
+* 4–6 characters is enough;
+* expire inactive rooms;
+* avoid offensive words if using word codes;
+* allow host to regenerate code;
+* do not require accounts.
+
+Room code maps to server room state.
+
+## What happens if a player disconnects?
+
+For turn-based/social games:
+
+* mark player as disconnected;
+* keep their seat for a grace period;
+* allow reconnect with same local token;
+* host can kick/replace after timeout;
+* game can pause or continue depending on rules.
+
+For real-time car game:
+
+* if disconnected briefly, car coasts/ghosts;
+* after timeout, remove car;
+* if reconnecting, rejoin as spectator or resume if safe.
+
+Use a local reconnect token stored on the device:
+
+```text
+roomId
+playerId
+reconnectToken
+```
+
+Do not rely only on nickname.
+
+## Event-based sync to minimize data usage
+
+For board/social games, sync events:
+
+```text
+player_joined
+role_assigned
+vote_cast
+card_played
+dice_rolled
+move_applied
+phase_ended
+```
+
+Avoid syncing full UI state repeatedly.
+
+Server keeps authoritative state. Clients reconstruct display from:
+
+* initial snapshot;
+* event log;
+* occasional compact state patch.
+
+## Why real-time online car multiplayer is harder
+
+It requires solving:
+
+* latency;
+* jitter;
+* packet loss;
+* prediction;
+* reconciliation;
+* collision fairness;
+* server authority;
+* cheating prevention;
+* clock synchronization;
+* interpolation;
+* player disconnects;
+* different device performance;
+* data budget control.
+
+A singleplayer car game can be fun with local physics. Online multiplayer needs the same physics to behave consistently across clients or be server-authoritative.
+
+Leave it for Phase 6.
+
+---
+
+# 10. Recommended first game list and development order
+
+## Which games should be included in the first MVP?
+
+First truly usable MVP:
+
+1. **Car Arena MVP**
+2. **One tiny simple game for validation**, such as 2048 or Minesweeper
+3. **Offline manager**
+4. **Quality mode settings**
+5. **PWA install/offline behavior**
+
+The tiny second game is useful because it proves your architecture is not hardcoded only for the car game.
+
+## Is it reasonable to build the car game first?
+
+Yes, because it is the game you care about most.
+
+But the scope must be reduced.
+
+The first car game should not be “online multiplayer car game.” It should be:
+
+* singleplayer;
+* one arena;
+* one car;
+* simple bots or targets;
+* short rounds;
+* touch + keyboard;
+* offline-ready;
+* low/high quality modes.
+
+That is reasonable.
+
+## Should you start with an easier game first?
+
+A practical approach:
+
+* build the app foundation;
+* add a tiny 2048/Minesweeper test game to validate routing/offline caching;
+* then build the car MVP.
+
+This is not because the car game is impossible. It is because offline architecture is easier to debug with a tiny game before Canvas physics enters the picture.
+
+## Development phases
+
+### Phase 0: Project foundation
+
+Goal:
+
+* static PWA shell;
+* routing;
+* game metadata;
+* settings;
+* offline architecture skeleton;
+* one tiny test game.
+
+Deliverables:
+
+* home page;
+* game cards;
+* settings screen;
+* app shell cache;
+* lazy-loaded game route;
+* local metadata storage.
+
+### Phase 1: Offline car game MVP
+
+Goal:
+
+* playable singleplayer car game.
+
+Deliverables:
+
+* Canvas renderer;
+* driving physics;
+* keyboard controls;
+* touch controls;
+* one arena;
+* collisions;
+* scoring;
+* pause/restart;
+* Ultra Low/High Quality visual differences;
+* offline download package.
+
+### Phase 2: Several simple singleplayer games
+
+Good additions:
+
+* 2048;
+* Minesweeper;
+* Snake;
+* Memory;
+* Solitaire-lite.
+
+Goal:
+
+* prove portal architecture works across multiple game types.
+
+### Phase 3: Same-device multiplayer games
+
+Good additions:
+
+* checkers;
+* backgammon;
+* local pass-and-play card game;
+* same-device party mini game.
+
+Goal:
+
+* make it useful with friends even without internet.
+
+### Phase 4: Online room system
+
+Goal:
+
+* private rooms with codes.
+
+Deliverables:
+
+* backend;
+* WebSocket connection;
+* create/join room;
+* player list;
+* reconnect token;
+* basic chat or ready check;
+* room expiry.
+
+### Phase 5: Werewolf/Vampire Village
+
+Goal:
+
+* first real online social game.
+
+Deliverables:
+
+* room lobby;
+* role assignment;
+* private role views;
+* night/day phases;
+* voting;
+* server-side hidden state;
+* reconnect support.
+
+### Phase 6: Online car multiplayer
+
+Goal:
+
+* real-time friend-only car mode.
+
+Deliverables:
+
+* authoritative server simulation;
+* input sync;
+* snapshot interpolation;
+* client prediction;
+* latency handling;
+* compact protocol;
+* data usage measurement.
+
+---
+
+# 11. File and folder structure recommendation
+
+Your proposed folders are reasonable.
+
+Recommended structure:
+
+```text
+/
+  package.json
+  vite.config.ts
+  tsconfig.json
+  index.html
+  public/
+    manifest.webmanifest
+    icons/
+    robots.txt
+
+  src/
+    main.ts
+    app/
+      router.ts
+      app-shell.ts
+      game-registry.ts
+      layout.ts
+
+    ui/
+      components/
+      screens/
+      modals/
+      styles/
+      icons/
+
+    core/
+      game-module.ts
+      game-loop.ts
+      math/
+      random/
+      events/
+      storage/
+      logger.ts
+
+    games/
+      car-arena/
+        index.ts
+        car-game.ts
+        physics/
+        rendering/
+        input/
+        bots/
+        arenas/
+        assets/
+        car-arena.manifest.ts
+
+      2048/
+        index.ts
+        game-2048.ts
+        game-2048.manifest.ts
+
+      minesweeper/
+        index.ts
+        minesweeper.manifest.ts
+
+    assets/
+      shared/
+      ui/
+      audio/
+      sprites/
+
+    pwa/
+      sw.ts
+      register-sw.ts
+      precache.ts
+      runtime-caching.ts
+
+    offline/
+      offline-manager.ts
+      package-manager.ts
+      cache-status.ts
+      storage-estimate.ts
+      update-checker.ts
+
+    settings/
+      settings-store.ts
+      settings-types.ts
+      quality-mode.ts
+
+    input/
+      keyboard.ts
+      touch.ts
+      virtual-joystick.ts
+      input-actions.ts
+
+    audio/
+      audio-manager.ts
+      sfx-registry.ts
+
+    shared/
+      protocol/
+      game-types.ts
+      room-types.ts
+      constants.ts
+
+  server/
+    README.md
+    package.json
+    src/
+      index.ts
+      rooms/
+      websocket/
+      games/
+      werewolf/
+
+  tests/
+    unit/
+    e2e/
+    pwa/
+    performance/
+
+  tools/
+    measure-bundle-size.ts
+    verify-game-manifests.ts
+    generate-icons.ts
+```
+
+## Folder purposes
+
+| Folder      | Purpose                                              |
+| ----------- | ---------------------------------------------------- |
+| `/games`    | Individual lazy-loaded games                         |
+| `/core`     | Framework-agnostic game/app utilities                |
+| `/assets`   | Shared local assets only                             |
+| `/pwa`      | Service worker, manifest registration, caching rules |
+| `/server`   | Future backend; not needed in MVP                    |
+| `/shared`   | Types shared by client/server later                  |
+| `/ui`       | Home, settings, components, layout                   |
+| `/settings` | Global settings and quality mode                     |
+| `/offline`  | Offline package manager and cache status             |
+| `/input`    | Keyboard/touch abstraction                           |
+| `/audio`    | Shared audio system                                  |
+| `/tests`    | PWA, offline, performance, unit/e2e tests            |
+| `/tools`    | Bundle checks, manifest validation, asset tools      |
+
+Important rule:
+
+> No game should directly own global PWA behavior. Games declare their package needs; the offline system manages downloads.
+
+---
+
+# 12. MVP definition
+
+## What the first truly usable version should include
+
+The first usable version should include:
+
+* mobile-friendly home page;
+* installable PWA metadata;
+* service worker;
+* offline app shell;
+* game cards;
+* settings screen;
+* Ultra Low / High Quality toggle;
+* one playable car game;
+* one tiny second game or test game;
+* per-game offline download;
+* offline status badges;
+* manual update check;
+* remove offline storage;
+* basic data size display;
+* no external scripts;
+* no ads;
+* no analytics.
+
+## Minimal but polished version
+
+Minimal does not mean ugly.
+
+A minimal polished version should have:
+
+* consistent color palette;
+* large touch buttons;
+* smooth screen transitions;
+* clean typography;
+* good spacing;
+* clear game cards;
+* responsive layout;
+* satisfying button feedback;
+* good loading states;
+* friendly offline messages;
+* car game that feels fun for at least a few rounds.
+
+The MVP should feel complete even with only one main game.
+
+## MVP success criteria
+
+| Requirement             | Success criteria                                              |
+| ----------------------- | ------------------------------------------------------------- |
+| Opens on mobile         | Loads quickly, responsive layout, no tiny buttons             |
+| Car game playable       | Touch and keyboard controls work                              |
+| Offline cache works     | App shell loads without network                               |
+| Airplane mode works     | Downloaded car game opens and plays                           |
+| Lazy loading works      | Home page does not load all game code                         |
+| Data usage measurable   | Build reports package sizes; network panel confirms low usage |
+| Ultra Low Mode works    | Lower FPS/effects/assets, no audio downloads                  |
+| High Quality Mode works | Better visuals without huge downloads                         |
+| Offline UI works        | Shows Offline ready / Not downloaded / Update available       |
+| Remove storage works    | Per-game cache can be deleted                                 |
+| No third-party bloat    | No analytics, ads, external fonts, CDNs                       |
+
+---
+
+# 13. Test plan
+
+## Offline testing
+
+Test:
+
+1. first visit online;
+2. service worker installed;
+3. app shell cached;
+4. game downloaded;
+5. close tab/app;
+6. disable network;
+7. reopen;
+8. play downloaded game;
+9. try undownloaded game;
+10. remove downloaded game;
+11. verify it no longer opens offline.
+
+## Lighthouse/PWA testing
+
+Run Lighthouse checks for:
+
+* PWA installability;
+* service worker;
+* manifest;
+* offline fallback;
+* performance;
+* accessibility;
+* best practices.
+
+Do not optimize for SEO beyond basic technical correctness.
+
+## Mobile viewport testing
+
+Test widths:
+
+* 320 px;
+* 360 px;
+* 390 px;
+* 414 px;
+* tablet portrait;
+* tablet landscape.
+
+Test:
+
+* home page;
+* settings;
+* game cards;
+* car controls;
+* pause menu;
+* offline manager.
+
+## Airplane mode testing
+
+Real device test:
+
+1. open online;
+2. download game;
+3. add to home screen;
+4. close browser/app;
+5. wait/reopen;
+6. enable airplane mode;
+7. launch from home screen;
+8. play game.
+
+Do this on:
+
+* Android Chrome;
+* iPhone Safari;
+* desktop Chrome;
+* desktop Safari if available.
+
+## Cache-clearing testing
+
+Test:
+
+* remove one game;
+* remove all games;
+* browser clears site data;
+* app detects missing cache;
+* IndexedDB says installed but file missing;
+* app repairs status to “Not downloaded” or “Storage removed.”
+
+This is important because cache and metadata can become inconsistent.
+
+## Data usage measurement
+
+Measure:
+
+* first home load;
+* first car game download low;
+* first car game download high;
+* replay after cached;
+* offline launch;
+* manual update check;
+* online room session later.
+
+Use:
+
+* browser DevTools Network tab;
+* disabled cache vs normal cache comparison;
+* production build only;
+* real mobile device where possible.
+
+## FPS/performance testing
+
+Measure:
+
+* car game Ultra Low target: stable 30 FPS;
+* High Quality target: close to 60 FPS on decent phones;
+* input latency;
+* frame drops during collisions/particles;
+* memory growth after restarting game several times;
+* battery/heat informally on mobile.
+
+## Bundle size checks
+
+Set budgets:
+
+| Bundle                |                       Budget |
+| --------------------- | ---------------------------: |
+| Initial app shell JS  | 100–250 KB compressed target |
+| Initial CSS           |   20–80 KB compressed target |
+| Game metadata         |                       <50 KB |
+| Car game low package  |                 <2 MB target |
+| Car game high package |                 <6 MB target |
+| Simple board game     |                 <1 MB target |
+
+Fail or warn when exceeded.
+
+## Touch control testing
+
+Test:
+
+* one-handed play;
+* two-handed play;
+* left-handed layout;
+* accidental browser scrolling;
+* touch target size;
+* pause/restart usability;
+* landscape/portrait behavior;
+* multi-touch steering + throttle;
+* touch cancel events;
+* iOS Safari address bar behavior.
+
+---
+
+# 14. Risks and mitigations
+
+## Risk: Scope creep
+
+The biggest risk is trying to build:
+
+* portal;
+* car game;
+* offline package manager;
+* multiplayer;
+* Werewolf;
+* online car mode;
+* accounts;
+* database;
+
+all at once.
+
+Mitigation:
+
+* phase the project;
+* define MVP strictly;
+* no backend until Phase 4;
+* no online car until Phase 6;
+* every phase must produce a playable result.
+
+## Risk: Bad game feel
+
+The car game can technically work but feel bad.
+
+Mitigation:
+
+* prototype physics early;
+* tune constants repeatedly;
+* test on phone, not only desktop;
+* prioritize steering, drift, collision feel;
+* add visual feedback only after controls feel good.
+
+## Risk: PWA cache bugs
+
+Offline-first apps often fail because caching logic is unclear.
+
+Mitigation:
+
+* keep app shell cache separate from game package cache;
+* use versioned caches;
+* use game manifests;
+* never delete old package before new package is complete;
+* add debug screen for cache status;
+* test airplane mode repeatedly.
+
+## Risk: Mobile browser differences
+
+Android Chrome and iOS Safari behave differently.
+
+Mitigation:
+
+* test both early;
+* do not rely only on custom install prompts;
+* provide iOS “Add to Home Screen” instructions;
+* avoid exotic APIs for core gameplay;
+* keep fallback paths.
+
+## Risk: iOS Safari limitations
+
+iOS PWA support is useful, but it is not identical to native apps or Android Chrome. Install prompt behavior is not uniform, and storage behavior can vary. Apple supports adding web apps to the Home Screen, while Chromium-style `beforeinstallprompt` should not be treated as universal. ([Apple Support][9])
+
+Mitigation:
+
+* include manual install instructions;
+* request persistent storage where available;
+* show offline status;
+* show “storage may have been removed” recovery;
+* keep game packages small enough to redownload easily.
+
+## Risk: Cache deleted by browser/OS
+
+Browser storage can be evicted under pressure or browser-specific policies. ([MDN Web Docs][2])
+
+Mitigation:
+
+* use `navigator.storage.persist()` where available;
+* show storage estimate;
+* keep packages small;
+* detect missing cache files;
+* allow redownload;
+* avoid promising permanent offline storage.
+
+## Risk: Unnecessary packages increase size
+
+Mitigation:
+
+* start with Vanilla TypeScript;
+* audit dependencies;
+* no UI framework unless justified;
+* no external fonts;
+* no analytics;
+* no large engines;
+* use bundle analyzer.
+
+## Risk: Online multiplayer complexity
+
+Mitigation:
+
+* start with room lobby;
+* then turn-based/social games;
+* then real-time;
+* use event-based protocols first;
+* avoid online car mode until singleplayer car game is solid.
+
+## Risk: Asset sizes grow too much
+
+Mitigation:
+
+* every asset has a budget;
+* every game has low/high package estimates;
+* audio is optional;
+* no music in default offline package;
+* use flat/procedural art where possible;
+* review package size in CI.
+
+---
+
+# 15. Final technology recommendation
+
+## React or Vanilla TypeScript?
+
+Recommendation:
+
+> **Vanilla TypeScript first. Preact later only if needed. Avoid React for MVP.**
+
+Reasoning:
+
+* smaller bundle;
+* fewer dependencies;
+* better low-data discipline;
+* enough for this UI;
+* pairs well with Canvas games;
+* easier to reason about offline packages.
+
+React is not wrong, but it solves problems you do not yet have.
+
+## Canvas or SVG?
+
+Recommendation:
+
+> **Canvas for real-time games. CSS/SVG/HTML for UI and board/card games.**
+
+Use Canvas for:
+
+* car game;
+* Snake;
+* arcade games;
+* particles;
+* real-time animation.
+
+Use SVG/CSS/HTML for:
+
+* cards;
+* boards;
+* menus;
+* buttons;
+* game launcher;
+* social deduction UI.
+
+Do not force everything into Canvas. Canvas is good for gameplay, not for every menu.
+
+## Node.js or not?
+
+Recommendation:
+
+> **No Node backend for MVP. Add backend only in Phase 4.**
+
+MVP can be fully static.
+
+When online rooms begin, choose one:
+
+### Option A: Cloudflare Pages + Workers + Durable Objects
+
+Best if you want:
+
+* static hosting and backend near the same platform;
+* room-like WebSocket coordination;
+* low maintenance;
+* friend-only scale;
+* easy custom domain setup.
+
+### Option B: Static host + Node `ws` backend
+
+Best if you want:
+
+* familiar Node server;
+* full control;
+* easier local mental model;
+* ability to host on VPS/Fly/Render/Railway.
+
+Either is fine. For your use case, I would lean Cloudflare Pages + Durable Objects for room games, unless you strongly prefer running your own Node server.
+
+## What should be used for WebSockets?
+
+Use:
+
+* native browser WebSocket API;
+* typed JSON messages for social/turn-based games;
+* binary or compact encoded messages later for real-time car mode.
+
+Avoid Socket.IO initially unless you need its specific features.
+
+## Hosting recommendation
+
+MVP:
+
+```text
+yourdomain.com
+  Static PWA
+  Vite build
+  Service worker
+  Cached game packages
+```
+
+Later:
+
+```text
+yourdomain.com
+  Static frontend
+
+api.yourdomain.com
+  Room API
+
+ws.yourdomain.com
+  WebSocket rooms
+```
+
+Static hosting should serve all assets with good compression and cache headers.
+
+## PWA implementation
+
+Recommendation:
+
+* Vite;
+* TypeScript;
+* `vite-plugin-pwa` with Workbox;
+* start simple;
+* move to custom `injectManifest` service worker when per-game offline packages become central;
+* app shell precache;
+* per-game manual caching through Cache API;
+* IndexedDB for installed package status.
+
+The Web App Manifest provides install-related metadata such as name and icons, while the service worker provides the offline behavior. ([MDN Web Docs][12])
+
+---
+
+# 16. Coding agent implementation plan
+
+The worst way to use a coding agent here is:
+
+> “Build the whole game portal with PWA, car game, multiplayer, offline, and settings.”
+
+That will produce a messy result.
+
+Use small goals with strict acceptance criteria.
+
+## How to divide the project
+
+Good task boundaries:
+
+1. project foundation;
+2. routing and game registry;
+3. settings system;
+4. PWA shell;
+5. offline cache manager;
+6. one tiny test game;
+7. car game physics prototype;
+8. car game controls;
+9. car game collision/scoring;
+10. quality mode integration;
+11. offline UI;
+12. tests and size checks.
+
+Each task should be independently reviewable.
+
+## Acceptance criteria style
+
+Every coding-agent task should include:
+
+* exact files/folders to create or modify;
+* what not to implement;
+* how to run;
+* how to test;
+* size/performance constraints;
+* mobile behavior;
+* no external CDN/scripts;
+* no backend unless the task is backend-specific.
+
+## First 5 coding-agent prompts
+
+### Prompt 1: Project foundation
+
+```text
+Create the foundation for a mobile-first personal mini game portal using Vite + TypeScript.
+
+Do not implement the car game yet.
+Do not add React.
+Do not add a backend.
+Do not use external CDNs, analytics, ads, or external fonts.
+
+Requirements:
+- Vite + TypeScript project structure.
+- Mobile-first home screen.
+- Game registry with metadata for at least:
+  - car-arena
+  - 2048-placeholder
+- Simple client-side router:
+  - /
+  - /games/:gameId
+  - /settings
+  - /offline
+- Shared app shell with top bar, page container, and error fallback.
+- Game cards showing:
+  - name
+  - description
+  - offline support
+  - estimated low/high size
+  - controls
+  - status placeholder
+- Settings screen placeholder with Ultra Low / High Quality toggle.
+- No game modules should be loaded on the home page except metadata.
+- Add basic responsive CSS with large mobile touch targets.
+
+Acceptance criteria:
+- npm install and npm run dev work.
+- npm run build works.
+- Home page is usable at 360px width.
+- Clicking a game route shows a placeholder game screen.
+- The game registry is typed.
+- Initial architecture makes lazy loading possible.
+- No third-party runtime UI framework is added.
+```
+
+### Prompt 2: PWA/offline system
+
+```text
+Add the initial PWA/offline foundation.
+
+Use Vite + TypeScript.
+Use a service worker approach suitable for later per-game offline packages.
+Do not add online multiplayer.
+Do not add analytics or external scripts.
+Do not auto-download all games.
+
+Requirements:
+- Web app manifest with local icons.
+- Service worker registration.
+- App shell caching so the home page can open offline after first load.
+- Offline fallback page/state.
+- Offline manager module with typed methods:
+  - getAppShellStatus()
+  - getGameOfflineStatus(gameId)
+  - downloadGamePackage(gameId, qualityMode)
+  - removeGamePackage(gameId)
+  - checkForGameUpdate(gameId)
+- For now, game package download can use placeholder package manifests.
+- Store offline metadata in IndexedDB.
+- Add an Offline screen that shows:
+  - app shell status
+  - per-game status
+  - storage estimate if available
+  - manual refresh/check button
+- Add clear development reset controls only in development mode.
+
+Acceptance criteria:
+- Build works.
+- First online load installs the service worker.
+- After reload, turning off network still shows the home page.
+- Offline screen shows app shell status.
+- No automatic update polling loop is added.
+- Ultra Low Mode does not trigger background network checks.
+```
+
+### Prompt 3: Canvas car game MVP
+
+```text
+Implement the first singleplayer Canvas car game MVP in /games/car-arena.
+
+Do not implement online multiplayer.
+Do not add a physics engine.
+Do not add large image/audio assets.
+Do not add car customization, tracks, accounts, or leaderboards.
+
+Requirements:
+- Lazy-loaded car game module.
+- Canvas renderer that resizes for mobile.
+- Fixed timestep game loop.
+- Player car with arcade physics:
+  - acceleration
+  - braking/reverse
+  - steering
+  - friction
+  - drift/handbrake
+- Keyboard controls:
+  - WASD/arrows
+  - Space for drift
+  - P/Escape pause
+  - R restart
+- Mobile touch controls:
+  - left steering area or virtual joystick
+  - right throttle/brake/drift buttons
+- One simple arena with walls and obstacles.
+- Collision against walls/obstacles.
+- Simple scoring:
+  - collect tokens
+  - drift bonus or survival score
+- Pause/restart/exit to home.
+- No external assets required; use Canvas shapes.
+
+Acceptance criteria:
+- Game is playable on desktop keyboard.
+- Game is playable on a mobile viewport with touch controls.
+- Canvas does not cause page scrolling while playing.
+- The car can drift visibly.
+- Collisions do not crash the game.
+- Restart resets the round.
+- Game module is lazy-loaded only when route is opened.
+```
+
+### Prompt 4: Ultra Low / High Quality setting
+
+```text
+Integrate Ultra Low Mode and High Quality Mode across the app and car game.
+
+Do not add new large assets.
+Do not add music.
+Do not add automatic update polling.
+
+Requirements:
+- Global settings store persists selected quality mode.
+- Settings screen allows switching:
+  - Ultra Low
+  - High Quality
+- Car game reacts to quality mode:
+  Ultra Low:
+    - target render rate around 30 FPS
+    - fewer/no particles
+    - lower device pixel ratio cap
+    - no audio
+    - simpler visual effects
+  High Quality:
+    - target up to 60 FPS
+    - more particles
+    - better visual feedback
+    - still no large required assets
+- Game metadata displays low/high estimated package size.
+- Offline package manager accepts quality mode parameter.
+- Add visible current quality mode indicator in game pause menu.
+
+Acceptance criteria:
+- Changing quality mode persists after reload.
+- Car game visibly changes behavior between modes.
+- Ultra Low Mode avoids unnecessary effects.
+- High Quality Mode remains performant.
+- No sound/music is loaded in Ultra Low Mode.
+- Existing offline shell still works.
+```
+
+### Prompt 5: Offline cache UI and testing system
+
+```text
+Build the user-facing offline cache UI and basic testing tools.
+
+Do not add multiplayer.
+Do not add accounts.
+Do not add external analytics.
+Do not make automatic network checks in Ultra Low Mode.
+
+Requirements:
+- Offline screen lists each game with:
+  - Not downloaded
+  - Offline ready
+  - Update available
+  - Partial/missing
+- Add buttons:
+  - Download for offline
+  - Remove from offline storage
+  - Check for update
+  - Download all singleplayer games
+- Use placeholder manifests where needed, but structure must support real per-game asset lists.
+- Add progress display during download.
+- Add error handling for failed downloads.
+- Add storage estimate display.
+- Detect when metadata says installed but cached files are missing.
+- Add a manual test checklist page or developer-only diagnostics panel:
+  - service worker active?
+  - app shell cached?
+  - game package cached?
+  - current online/offline state
+  - storage estimate
+  - current quality mode
+
+Acceptance criteria:
+- User can download car game for offline use.
+- User can remove car game from offline storage.
+- Offline screen status updates correctly.
+- In browser offline mode, downloaded game opens.
+- In browser offline mode, not-downloaded game shows a clear message.
+- Download all only includes offline-capable singleplayer games.
+- No background update polling is introduced.
+```
+
+---
+
+# 17. Final decision summary
+
+## Is this project feasible?
+
+Yes. It is feasible if you keep the first version focused.
+
+The realistic first version is:
+
+* static PWA;
+* offline game launcher;
+* one polished singleplayer car game;
+* one tiny simple game;
+* manual offline downloads;
+* Ultra Low / High Quality setting;
+* no backend;
+* no online multiplayer yet.
+
+That is very achievable.
+
+## Difficulty level
+
+Overall project difficulty:
+
+> **Medium at first, high later.**
+
+By area:
+
+| Area                             | Difficulty  |
+| -------------------------------- | ----------- |
+| Static game portal               | Low–medium  |
+| PWA offline shell                | Medium      |
+| Per-game offline packages        | Medium      |
+| Simple board/card games          | Low–medium  |
+| Good car game feel               | Medium–high |
+| Same-device multiplayer          | Medium      |
+| Online turn-based rooms          | Medium      |
+| Werewolf/Vampire Village         | Medium–high |
+| Real-time online car multiplayer | High        |
+
+The two hardest parts are:
+
+1. making the car game actually feel good;
+2. making real-time online car multiplayer later.
+
+## Where to start
+
+Start here:
+
+1. Vite + TypeScript foundation.
+2. Mobile-first home page.
+3. Game metadata registry.
+4. PWA app shell.
+5. Offline status screen.
+6. Tiny test game.
+7. Canvas car game MVP.
+
+Do not start with backend, accounts, or online rooms.
+
+## Most realistic roadmap
+
+### First usable milestone
+
+* home page;
+* settings;
+* PWA install basics;
+* app shell works offline;
+* car game placeholder route;
+* one tiny test game.
+
+### First fun milestone
+
+* car game playable;
+* touch controls work;
+* drifting and collisions feel decent;
+* score loop works;
+* 90-second rounds.
+
+### First offline milestone
+
+* car game downloadable;
+* airplane mode works;
+* status badges work;
+* remove/redownload works;
+* Ultra Low Mode avoids extra downloads.
+
+### First friend milestone
+
+* add 2–3 simple games;
+* add same-device checkers/backgammon/card game;
+* make the portal useful even without online multiplayer.
+
+### First online milestone
+
+* room codes;
+* WebSocket lobby;
+* reconnect token;
+* simple event sync.
+
+### First social game milestone
+
+* Werewolf/Vampire Village with server-controlled roles and phases.
+
+### Final advanced milestone
+
+* online car multiplayer, only after the offline car game is genuinely fun.
+
+## Clearest final recommendation
+
+Build it as:
+
+```text
+Frontend:
+  Vite + TypeScript + Vanilla TS
+
+Rendering:
+  Canvas for car/arcade games
+  CSS/SVG/HTML for UI and board games
+
+PWA:
+  Service Worker + Cache API + IndexedDB
+  Workbox/vite-plugin-pwa, with custom control over game packages
+
+Hosting:
+  Static hosting first
+  Custom domain
+  No backend until online rooms
+
+Backend later:
+  Cloudflare Workers + Durable Objects
+  or Node.js + native WebSocket/ws
+
+Data policy:
+  No ads
+  No analytics
+  No external CDNs
+  No external fonts
+  No automatic heavy update checks
+  Manual offline package downloads
+```
+
+The project is worth doing, but the winning strategy is restraint: make a small, clean, offline-first personal arcade that works reliably before expanding into online multiplayer.

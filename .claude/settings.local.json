@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__codebase-memory-mcp__list_projects",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(npm run *)"
+    ]
+  },
+  "outputStyle": "Explanatory",
+  "prefersReducedMotion": false
+}
