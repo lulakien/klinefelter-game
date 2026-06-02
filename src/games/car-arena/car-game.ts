@@ -71,6 +71,7 @@ interface Racer {
   vy: number;
   angle: number;
   steer: number;
+  throttle: number;
   drift: boolean;
   driftCharge: number;
   boostTimer: number;
@@ -114,8 +115,8 @@ const KARTS: KartSpec[] = [
     id: "balanced",
     name: "Balanced",
     color: "#1fb6ff",
-    maxSpeed: 284,
-    acceleration: 485,
+    maxSpeed: 266,
+    acceleration: 450,
     handling: 2.75,
     steerResponse: 5.6,
     grip: 0.9,
@@ -128,8 +129,8 @@ const KARTS: KartSpec[] = [
     id: "speedster",
     name: "Speedster",
     color: "#ff4d6d",
-    maxSpeed: 322,
-    acceleration: 466,
+    maxSpeed: 302,
+    acceleration: 432,
     handling: 2.35,
     steerResponse: 5.2,
     grip: 0.84,
@@ -142,8 +143,8 @@ const KARTS: KartSpec[] = [
     id: "drifter",
     name: "Drifter",
     color: "#b76cff",
-    maxSpeed: 276,
-    acceleration: 500,
+    maxSpeed: 258,
+    acceleration: 462,
     handling: 3.0,
     steerResponse: 6.2,
     grip: 0.87,
@@ -156,8 +157,8 @@ const KARTS: KartSpec[] = [
     id: "heavy",
     name: "Heavy",
     color: "#ffc542",
-    maxSpeed: 268,
-    acceleration: 425,
+    maxSpeed: 252,
+    acceleration: 395,
     handling: 2.05,
     steerResponse: 4.8,
     grip: 0.94,
@@ -251,7 +252,7 @@ export class CarGame {
     } else if (this.phase === "racing") {
       this.accumulator = Math.min(MAX_ACCUMULATOR, this.accumulator + dt);
       while (this.accumulator >= FIXED_DT) {
-        this.updateRace(FIXED_DT, input.steer, input.drift);
+        this.updateRace(FIXED_DT, input.steer, input.drift, input.aimAngle, input.aimStrength);
         this.accumulator -= FIXED_DT;
       }
     }
@@ -294,6 +295,7 @@ export class CarGame {
       vy: 0,
       angle: Math.atan2(firstSegment.y, firstSegment.x),
       steer: 0,
+      throttle: 1,
       drift: false,
       driftCharge: 0,
       boostTimer: 0,
@@ -328,7 +330,7 @@ export class CarGame {
     this.lastTime = performance.now();
   }
 
-  private updateRace(dt: number, playerSteer: number, playerDrift: boolean): void {
+  private updateRace(dt: number, playerSteer: number, playerDrift: boolean, playerAimAngle: number | null, playerAimStrength: number): void {
     this.raceTime += dt;
     for (const racer of this.racers) {
       if (racer.finishTime !== null) continue;
@@ -339,9 +341,14 @@ export class CarGame {
 
       if (racer.bot) this.updateBotInput(racer, dt);
       else {
+        let desiredSteer = playerSteer;
+        if (playerAimAngle !== null && playerAimStrength > 0.12) {
+          desiredSteer = clamp(angleDiff(playerAimAngle, racer.angle) / 1.05, -1, 1) * playerAimStrength;
+        }
         const response = 1 - Math.exp(-racer.kart.steerResponse * dt);
-        racer.steer += (playerSteer - racer.steer) * response;
-        racer.drift = playerDrift && Math.abs(playerSteer) > 0.18;
+        racer.steer += (desiredSteer - racer.steer) * response;
+        racer.throttle = 1;
+        racer.drift = playerDrift && Math.abs(racer.steer) > 0.18;
       }
 
       this.updateRacerPhysics(racer, dt);
@@ -358,11 +365,19 @@ export class CarGame {
 
   private updateBotInput(racer: Racer, dt: number): void {
     const speed = Math.hypot(racer.vx, racer.vy);
-    const target = lookAheadOnCourse(this.course, racer.x, racer.y, 120 + speed * 0.28, racer.aiOffset);
+    const nearTarget = lookAheadOnCourse(this.course, racer.x, racer.y, 80 + speed * 0.18, racer.aiOffset);
+    const farTarget = lookAheadOnCourse(this.course, racer.x, racer.y, 150 + speed * 0.26, racer.aiOffset * 0.8);
+    const nearDiff = Math.abs(angleDiff(Math.atan2(nearTarget.y - racer.y, nearTarget.x - racer.x), racer.angle));
+    const target = nearDiff > 0.55 ? nearTarget : farTarget;
     const desired = Math.atan2(target.y - racer.y, target.x - racer.x);
     let diff = angleDiff(desired, racer.angle);
     diff += Math.sin(this.raceTime * 0.8 + racer.aiOffset) * (1 - racer.aiSkill) * 0.14;
     racer.steer = clamp(diff / 1.02, -0.78, 0.78);
+    const turnLoad = Math.abs(diff);
+    racer.throttle = clamp(1 - turnLoad * 0.42, 0.58, 1);
+    if (!isOnRoad(this.course, racer.x, racer.y, 6)) {
+      racer.throttle = Math.min(racer.throttle, 0.72);
+    }
     racer.drift = Math.abs(diff) > 0.72 && speed > 165 && racer.aiSkill > 0.72 && racer.stuckTimer < 0.8;
     if (racer.drift && Math.random() < (1 - racer.aiSkill) * dt * 1.8) {
       racer.drift = false;
@@ -412,8 +427,8 @@ export class CarGame {
     const offroadAccelScale = offroad ? 0.72 + (kart.grassResistance - 0.5) * 0.35 : 1;
     const turnScale = racer.drift ? 1.08 : 0.78;
     racer.angle += racer.steer * kart.handling * speedRatio * dt * turnScale;
-    racer.vx += forward.x * kart.acceleration * botScale * offroadAccelScale * dt;
-    racer.vy += forward.y * kart.acceleration * botScale * offroadAccelScale * dt;
+    racer.vx += forward.x * kart.acceleration * botScale * racer.throttle * offroadAccelScale * dt;
+    racer.vy += forward.y * kart.acceleration * botScale * racer.throttle * offroadAccelScale * dt;
 
     const lateral = {
       x: racer.vx - forward.x * forwardSpeed,
@@ -428,7 +443,7 @@ export class CarGame {
     } else if (racer.driftCharge > 0) {
       if (racer.driftCharge > 0.45 && speed > 135) {
         racer.boostTimer = Math.min(0.65, 0.24 + racer.driftCharge * 0.22);
-        const boost = kart.driftBoost * clamp(racer.driftCharge, 0, 1);
+        const boost = kart.driftBoost * 0.82 * clamp(racer.driftCharge, 0, 1);
         racer.vx += forward.x * boost;
         racer.vy += forward.y * boost;
         if (!racer.bot) playSfx("drift");
@@ -637,6 +652,7 @@ export class CarGame {
   }
 
   private drawMobileMenu(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const compact = h < 540;
     const panelX = 14;
     const panelY = 14;
     const panelW = w - 28;
@@ -650,22 +666,23 @@ export class CarGame {
 
     ctx.fillStyle = "#213547";
     ctx.textAlign = "center";
-    ctx.font = "900 30px system-ui, sans-serif";
-    ctx.fillText("Tiny Drift Karts", w / 2, panelY + 42);
-    ctx.font = "13px system-ui, sans-serif";
+    ctx.font = `900 ${compact ? 24 : 30}px system-ui, sans-serif`;
+    ctx.fillText("Tiny Drift Karts", w / 2, panelY + (compact ? 32 : 42));
+    ctx.font = `${compact ? 12 : 13}px system-ui, sans-serif`;
     ctx.fillStyle = "rgba(33,53,71,0.72)";
-    ctx.fillText("Pick, race, drift.", w / 2, panelY + 64);
+    ctx.fillText("Pick, race, drift.", w / 2, panelY + (compact ? 50 : 64));
 
     const rowX = panelX + 18;
     const rowW = panelW - 36;
-    let y = panelY + 88;
+    const rowGap = compact ? 58 : 68;
+    let y = panelY + (compact ? 66 : 88);
     this.drawPickerRow(ctx, "Course", COURSES[this.selectedCourse].name, "course", rowX, y, rowW);
-    y += 68;
+    y += rowGap;
     this.drawPickerRow(ctx, "Difficulty", DIFFICULTIES[this.selectedDifficulty].name, "difficulty", rowX, y, rowW);
-    y += 68;
+    y += rowGap;
     this.drawPickerRow(ctx, "Kart", KARTS[this.selectedKart].name, "kart", rowX, y, rowW);
 
-    const buttonY = Math.max(y + 74, h - 86);
+    const buttonY = Math.min(y + rowGap, h - 72);
     const backW = Math.min(145, (rowW - 12) * 0.42);
     this.addButton(ctx, "back", "Back", rowX, buttonY, backW, 48, false);
     this.addButton(ctx, "start", "Start Race", rowX + backW + 12, buttonY, rowW - backW - 12, 48, true);
@@ -802,21 +819,23 @@ export class CarGame {
   }
 
   private drawGates(ctx: CanvasRenderingContext2D): void {
+    const activeGateIndex = this.racers[0]?.nextGate ?? 0;
     for (let i = 0; i < this.course.gates.length; i++) {
       const gate = this.course.gates[i];
+      const active = i === activeGateIndex;
       if (!gate.finish) {
-        ctx.fillStyle = "rgba(14,165,233,0.18)";
+        ctx.fillStyle = active ? "rgba(255,212,71,0.22)" : "rgba(14,165,233,0.12)";
         drawGatePanel(ctx, gate, 16);
         ctx.fill();
       }
       ctx.lineWidth = gate.finish ? 14 : 8;
-      ctx.strokeStyle = gate.finish ? "#111827" : "rgba(14,165,233,0.85)";
+      ctx.strokeStyle = gate.finish ? "#111827" : active ? "rgba(255,212,71,0.95)" : "rgba(14,165,233,0.58)";
       ctx.beginPath();
       ctx.moveTo(gate.left.x, gate.left.y);
       ctx.lineTo(gate.right.x, gate.right.y);
       ctx.stroke();
-      drawGatePost(ctx, gate.left, gate.finish);
-      drawGatePost(ctx, gate.right, gate.finish);
+      drawGatePost(ctx, gate.left, gate.finish, active);
+      drawGatePost(ctx, gate.right, gate.finish, active);
       if (gate.finish) {
         const steps = 12;
         for (let row = -1; row <= 1; row++) {
@@ -831,14 +850,6 @@ export class CarGame {
             ctx.stroke();
           }
         }
-      } else if (this.quality !== "ultra-low") {
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "800 22px system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(gate.label, gate.mid.x, gate.mid.y);
-        ctx.textBaseline = "alphabetic";
-        ctx.textAlign = "start";
       }
     }
   }
@@ -1283,23 +1294,38 @@ function drawGatePanel(ctx: CanvasRenderingContext2D, gate: Gate, thickness: num
   ctx.closePath();
 }
 
-function drawGatePost(ctx: CanvasRenderingContext2D, point: Vec, finish: boolean): void {
+function drawGatePost(ctx: CanvasRenderingContext2D, point: Vec, finish: boolean, active: boolean): void {
   ctx.save();
   ctx.translate(point.x, point.y);
+  if (active) {
+    ctx.fillStyle = "rgba(255,212,71,0.28)";
+    ctx.beginPath();
+    ctx.arc(0, -17, 24, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.fillStyle = "rgba(15,23,42,0.22)";
   ctx.beginPath();
   ctx.ellipse(5, 7, 10, 6, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = finish ? "#111827" : "#0284c7";
+  ctx.fillStyle = finish ? "#111827" : active ? "#f59e0b" : "#0284c7";
   roundRect(ctx, -5, -18, 10, 30, 4);
   ctx.fill();
-  ctx.strokeStyle = "#ffffff";
+  ctx.strokeStyle = active ? "#fff7ad" : "#ffffff";
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.fillStyle = finish ? "#ffffff" : "#e0f2fe";
+  ctx.fillStyle = finish ? "#ffffff" : active ? "#ffd447" : "#e0f2fe";
   ctx.beginPath();
   ctx.arc(0, -21, 7, 0, Math.PI * 2);
   ctx.fill();
+  if (active) {
+    ctx.fillStyle = "#213547";
+    ctx.beginPath();
+    ctx.moveTo(0, -29);
+    ctx.lineTo(6, -18);
+    ctx.lineTo(-6, -18);
+    ctx.closePath();
+    ctx.fill();
+  }
   ctx.restore();
 }
 

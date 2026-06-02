@@ -39,6 +39,13 @@ interface TouchState {
   driftId: number | null;
 }
 
+export interface TinyKartInput extends CarInput {
+  pause: boolean;
+  restart: boolean;
+  aimAngle: number | null;
+  aimStrength: number;
+}
+
 export class InputManager {
   private rawKeys: RawKeys = {
     left: false,
@@ -97,14 +104,22 @@ export class InputManager {
     this.canvasRect = null;
   }
 
-  poll(): CarInput & { pause: boolean; restart: boolean } {
+  poll(): TinyKartInput {
     let steer = 0;
+    let aimAngle: number | null = null;
+    let aimStrength = 0;
     if (this.rawKeys.left) steer -= 1;
     if (this.rawKeys.right) steer += 1;
 
     if (this.touch.steerActive && this.canvasRect) {
       const radius = Math.max(42, Math.min(78, this.canvasRect.width * 0.16));
       const dx = this.touch.steerX - this.touch.steerCenterX;
+      const dy = this.touch.steerY - this.touch.steerCenterY;
+      const dist = Math.hypot(dx, dy);
+      aimStrength = Math.max(0, Math.min(1, dist / (radius * 0.78)));
+      if (aimStrength > 0.12) {
+        aimAngle = Math.atan2(dy, dx);
+      }
       steer = Math.max(-1, Math.min(1, dx / radius));
     }
 
@@ -122,6 +137,8 @@ export class InputManager {
       drift: this.rawKeys.drift || this.touch.driftActive,
       pause,
       restart,
+      aimAngle,
+      aimStrength,
     };
   }
 
