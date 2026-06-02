@@ -20,6 +20,15 @@ export default defineConfig({
           if (id.includes("games/minesweeper/")) {
             return "game-minesweeper";
           }
+          if (id.includes("games/solitaire/")) {
+            return "game-solitaire";
+          }
+          if (id.includes("games/water-sort/")) {
+            return "game-water-sort";
+          }
+          if (id.includes("games/block-blast/")) {
+            return "game-block-blast";
+          }
         },
       },
     },
