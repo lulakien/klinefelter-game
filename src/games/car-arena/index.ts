@@ -16,8 +16,26 @@ export async function mount(
 ): Promise<() => void> {
   const previousBodyOverflow = document.body.style.overflow;
   const previousBodyOverscroll = document.body.style.overscrollBehavior;
+  const topBar = document.querySelector<HTMLElement>(".app-topbar");
+  const previousTopBarDisplay = topBar?.style.display ?? "";
   document.body.style.overflow = "hidden";
   document.body.style.overscrollBehavior = "none";
+  if (topBar) {
+    topBar.style.display = "none";
+  }
+
+  const lockLandscape = async () => {
+    try {
+      const orientation = screen.orientation as ScreenOrientation & {
+        lock?: (orientation: string) => Promise<void>;
+      };
+      await orientation.lock?.("landscape");
+    } catch {
+      // Most mobile browsers require fullscreen/user gesture; the in-game
+      // rotate overlay is the reliable fallback.
+    }
+  };
+  void lockLandscape();
 
   // Prevent page scrolling while playing
   container.style.overflow = "hidden";
@@ -26,7 +44,7 @@ export async function mount(
   container.style.alignItems = "center";
   container.style.justifyContent = "center";
   container.style.width = "100vw";
-  container.style.height = "calc(100dvh - 56px)";
+  container.style.height = "100dvh";
   container.style.minHeight = "320px";
   container.style.position = "relative";
 
@@ -66,6 +84,14 @@ export async function mount(
     // Reset container styles
     document.body.style.overflow = previousBodyOverflow;
     document.body.style.overscrollBehavior = previousBodyOverscroll;
+    if (topBar) {
+      topBar.style.display = previousTopBarDisplay;
+    }
+    try {
+      screen.orientation?.unlock?.();
+    } catch {
+      // Ignore unsupported orientation APIs.
+    }
     container.style.overflow = "";
     container.style.display = "";
     container.style.flexDirection = "";

@@ -613,6 +613,7 @@ export class CarGame {
       if (this.phase === "countdown") this.drawCountdown(ctx, w, h);
       if (this.phase === "paused") this.drawPauseMenu(ctx, w, h);
       if (this.phase === "results") this.drawResults(ctx, w, h);
+      if (isMobilePortrait(w, h)) this.drawRotateOverlay(ctx, w, h);
     }
   }
 
@@ -746,7 +747,7 @@ export class CarGame {
   private drawRace(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     this.buttons = [];
     const hudH = getHudHeight(w);
-    const controlReserve = w < 700 ? 118 : 28;
+    const controlReserve = getControlReserve(w, h);
     const scale = Math.min(w / WORLD_W, (h - hudH - controlReserve) / WORLD_H);
     const ox = (w - WORLD_W * scale) / 2;
     const oy = hudH + (h - hudH - controlReserve - WORLD_H * scale) / 2;
@@ -1009,34 +1010,68 @@ export class CarGame {
       roundRect(ctx, w - 180, 67, 150 * clamp(player.driftCharge, 0, 1), 8, 4);
       ctx.fill();
     }
+
+    if (isTouchLayout(w, _h)) {
+      this.drawPauseButton(ctx, w);
+    }
+  }
+
+  private drawPauseButton(ctx: CanvasRenderingContext2D, w: number): void {
+    const size = 38;
+    const x = w - size - 10;
+    const y = getHudHeight(w) + 10;
+    this.buttons.push({ id: "pause-touch", text: "Pause", rect: { x, y, w: size, h: size } });
+
+    const grad = ctx.createLinearGradient(x, y, x, y + size);
+    grad.addColorStop(0, "rgba(15,23,42,0.88)");
+    grad.addColorStop(1, "rgba(33,53,71,0.74)");
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = "rgba(255,212,71,0.88)";
+    ctx.lineWidth = 2;
+    roundRect(ctx, x, y, size, size, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffd447";
+    roundRect(ctx, x + 12, y + 10, 5, 18, 2);
+    ctx.fill();
+    roundRect(ctx, x + 21, y + 10, 5, 18, 2);
+    ctx.fill();
   }
 
   private drawTouchControls(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     const steer = getSteerControl(w, h);
     const drift = getDriftControl(w, h);
     const touch = this.input.getTouchDisplayState();
-    ctx.globalAlpha = 0.42;
-    ctx.fillStyle = "rgba(15,23,42,0.28)";
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 3;
+    const steerGrad = ctx.createRadialGradient(steer.x, steer.y, 8, steer.x, steer.y, steer.radius);
+    steerGrad.addColorStop(0, "rgba(255,255,255,0.16)");
+    steerGrad.addColorStop(1, "rgba(15,23,42,0.5)");
+    ctx.globalAlpha = 0.88;
+    ctx.fillStyle = steerGrad;
+    ctx.strokeStyle = "rgba(255,255,255,0.42)";
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.arc(steer.x, steer.y, steer.radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    ctx.globalAlpha = 0.58;
+    ctx.globalAlpha = 0.52;
+    ctx.strokeStyle = "rgba(255,212,71,0.48)";
     ctx.beginPath();
     ctx.arc(steer.x, steer.y, steer.radius * 0.42, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = touch.steer.active ? 0.92 : 0.58;
-    ctx.fillStyle = touch.steer.active ? "#ffd447" : "rgba(255,255,255,0.7)";
+    ctx.fillStyle = touch.steer.active ? "#ffd447" : "rgba(255,255,255,0.62)";
     ctx.strokeStyle = touch.steer.active ? "#213547" : "rgba(255,255,255,0.75)";
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(touch.steer.knobX, touch.steer.knobY, Math.max(16, touch.steer.radius * 0.28), 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    ctx.globalAlpha = 0.42;
-    ctx.fillStyle = touch.driftActive ? "rgba(255,212,71,0.58)" : "rgba(15,23,42,0.28)";
+    const driftGrad = ctx.createRadialGradient(drift.x, drift.y, 8, drift.x, drift.y, drift.radius);
+    driftGrad.addColorStop(0, touch.driftActive ? "rgba(255,212,71,0.7)" : "rgba(255,255,255,0.14)");
+    driftGrad.addColorStop(1, touch.driftActive ? "rgba(245,158,11,0.72)" : "rgba(15,23,42,0.5)");
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = driftGrad;
     ctx.strokeStyle = touch.driftActive ? "#ffd447" : "#ffffff";
     ctx.beginPath();
     ctx.arc(drift.x, drift.y, drift.radius, 0, Math.PI * 2);
@@ -1049,6 +1084,44 @@ export class CarGame {
     ctx.fillText("DRIFT", drift.x, drift.y + 4);
     ctx.textAlign = "start";
     ctx.globalAlpha = 1;
+  }
+
+  private drawRotateOverlay(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    ctx.fillStyle = "rgba(15,23,42,0.78)";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "rgba(255,255,255,0.94)";
+    roundRect(ctx, 24, h / 2 - 116, w - 48, 212, 18);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,212,71,0.7)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = "#213547";
+    ctx.textAlign = "center";
+    ctx.font = "900 28px system-ui, sans-serif";
+    ctx.fillText("Rotate Your Phone", w / 2, h / 2 - 50);
+    ctx.font = "700 15px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(33,53,71,0.76)";
+    ctx.fillText("Tiny Drift Karts plays best sideways.", w / 2, h / 2 - 18);
+    ctx.fillText("Turn your device for the full track view.", w / 2, h / 2 + 8);
+
+    ctx.save();
+    ctx.translate(w / 2, h / 2 + 56);
+    ctx.strokeStyle = "#ffd447";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 28, -0.3, Math.PI * 1.35);
+    ctx.stroke();
+    ctx.fillStyle = "#ffd447";
+    ctx.beginPath();
+    ctx.moveTo(-27, 4);
+    ctx.lineTo(-42, 6);
+    ctx.lineTo(-34, 19);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    ctx.textAlign = "start";
   }
 
   private drawCountdown(ctx: CanvasRenderingContext2D, w: number, h: number): void {
@@ -1119,6 +1192,7 @@ export class CarGame {
     const hit = this.buttons.find((b) => x >= b.rect.x && x <= b.rect.x + b.rect.w && y >= b.rect.y && y <= b.rect.y + b.rect.h);
     if (!hit) return;
     if (hit.id === "resume") this.phase = "racing";
+    else if (hit.id === "pause-touch") this.phase = "paused";
     else if (hit.id === "start" || hit.id === "restart") this.startRace();
     else if (hit.id === "back") this.exitToMenu?.();
     else if (hit.id === "menu") this.phase = "menu";
@@ -1413,6 +1487,20 @@ function wrapIndex(value: number, length: number): number {
 
 function getHudHeight(width: number): number {
   return width < 680 ? 64 : 58;
+}
+
+function isTouchLayout(width: number, height: number): boolean {
+  return width < 900 || height < 560;
+}
+
+function isMobilePortrait(width: number, height: number): boolean {
+  return height > width * 1.12 && width < 700;
+}
+
+function getControlReserve(width: number, height: number): number {
+  if (isMobilePortrait(width, height)) return 132;
+  if (isTouchLayout(width, height)) return 92;
+  return 28;
 }
 
 function getSteerControl(width: number, height: number): { x: number; y: number; radius: number } {
