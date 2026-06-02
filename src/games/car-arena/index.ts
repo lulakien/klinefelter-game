@@ -44,9 +44,17 @@ export async function mount(
   container.style.alignItems = "center";
   container.style.justifyContent = "center";
   container.style.width = "100vw";
-  container.style.height = "100dvh";
   container.style.minHeight = "320px";
   container.style.position = "relative";
+
+  const syncViewportSize = () => {
+    const viewport = window.visualViewport;
+    const width = viewport?.width ?? window.innerWidth;
+    const height = viewport?.height ?? window.innerHeight;
+    container.style.width = `${width}px`;
+    container.style.height = `${height}px`;
+  };
+  syncViewportSize();
 
   // Create canvas
   const canvas = document.createElement("canvas");
@@ -65,12 +73,19 @@ export async function mount(
   game.start(canvas);
 
   // Handle window resize
-  const onResize = () => game.handleResize();
-  window.addEventListener("resize", onResize);
+  const onViewportResize = () => {
+    syncViewportSize();
+    game.handleResize();
+  };
+  window.addEventListener("resize", onViewportResize);
+  window.visualViewport?.addEventListener("resize", onViewportResize);
+  window.visualViewport?.addEventListener("scroll", onViewportResize);
 
   // Return cleanup function
   return () => {
-    window.removeEventListener("resize", onResize);
+    window.removeEventListener("resize", onViewportResize);
+    window.visualViewport?.removeEventListener("resize", onViewportResize);
+    window.visualViewport?.removeEventListener("scroll", onViewportResize);
     // Always stop the game loop, even if other cleanup fails
     try {
       game.destroy();

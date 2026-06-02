@@ -610,7 +610,10 @@ export class CarGame {
     if (this.phase === "menu") this.drawMenu(ctx, w, h);
     else {
       this.drawRace(ctx, w, h);
-      if (this.phase === "countdown") this.drawCountdown(ctx, w, h);
+      if (this.phase === "countdown") {
+        this.drawCountdown(ctx, w, h);
+        this.drawTouchControls(ctx, w, h);
+      }
       if (this.phase === "paused") this.drawPauseMenu(ctx, w, h);
       if (this.phase === "results") this.drawResults(ctx, w, h);
       if (isMobilePortrait(w, h)) this.drawRotateOverlay(ctx, w, h);
@@ -1043,47 +1046,109 @@ export class CarGame {
     const steer = getSteerControl(w, h);
     const drift = getDriftControl(w, h);
     const touch = this.input.getTouchDisplayState();
-    const steerGrad = ctx.createRadialGradient(steer.x, steer.y, 8, steer.x, steer.y, steer.radius);
-    steerGrad.addColorStop(0, "rgba(255,255,255,0.16)");
-    steerGrad.addColorStop(1, "rgba(15,23,42,0.5)");
-    ctx.globalAlpha = 0.88;
-    ctx.fillStyle = steerGrad;
-    ctx.strokeStyle = "rgba(255,255,255,0.42)";
-    ctx.lineWidth = 2.5;
+
+    ctx.save();
+    ctx.globalAlpha = 0.96;
+    ctx.shadowColor = "rgba(15,23,42,0.36)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 8;
+    const plateRadius = steer.radius + 16;
+    const plateGrad = ctx.createRadialGradient(steer.x, steer.y, 8, steer.x, steer.y, plateRadius);
+    plateGrad.addColorStop(0, "rgba(38,54,74,0.86)");
+    plateGrad.addColorStop(1, "rgba(12,20,34,0.74)");
+    ctx.fillStyle = plateGrad;
+    ctx.strokeStyle = "rgba(255,212,71,0.32)";
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(steer.x, steer.y, steer.radius, 0, Math.PI * 2);
+    ctx.arc(steer.x, steer.y, plateRadius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    ctx.globalAlpha = 0.52;
-    ctx.strokeStyle = "rgba(255,212,71,0.48)";
+    ctx.shadowColor = "transparent";
+
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 8; i++) {
+      const angle = (Math.PI * 2 * i) / 8;
+      const inner = steer.radius * 0.68;
+      const outer = steer.radius * 0.92;
+      ctx.beginPath();
+      ctx.moveTo(steer.x + Math.cos(angle) * inner, steer.y + Math.sin(angle) * inner);
+      ctx.lineTo(steer.x + Math.cos(angle) * outer, steer.y + Math.sin(angle) * outer);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = "rgba(255,212,71,0.56)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(steer.x, steer.y, steer.radius * 0.78, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.22)";
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(steer.x, steer.y, steer.radius * 0.42, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.globalAlpha = touch.steer.active ? 0.92 : 0.58;
-    ctx.fillStyle = touch.steer.active ? "#ffd447" : "rgba(255,255,255,0.62)";
-    ctx.strokeStyle = touch.steer.active ? "#213547" : "rgba(255,255,255,0.75)";
+
+    const knobGrad = ctx.createRadialGradient(touch.steer.knobX - 6, touch.steer.knobY - 7, 3, touch.steer.knobX, touch.steer.knobY, Math.max(18, touch.steer.radius * 0.32));
+    knobGrad.addColorStop(0, "#fff2a8");
+    knobGrad.addColorStop(0.42, touch.steer.active ? "#ffd447" : "#e8eef5");
+    knobGrad.addColorStop(1, touch.steer.active ? "#c78c12" : "#8ea0b6");
+    ctx.fillStyle = knobGrad;
+    ctx.strokeStyle = "rgba(15,23,42,0.84)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(touch.steer.knobX, touch.steer.knobY, Math.max(16, touch.steer.radius * 0.28), 0, Math.PI * 2);
+    ctx.arc(touch.steer.knobX, touch.steer.knobY, Math.max(18, touch.steer.radius * 0.32), 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    const driftGrad = ctx.createRadialGradient(drift.x, drift.y, 8, drift.x, drift.y, drift.radius);
-    driftGrad.addColorStop(0, touch.driftActive ? "rgba(255,212,71,0.7)" : "rgba(255,255,255,0.14)");
-    driftGrad.addColorStop(1, touch.driftActive ? "rgba(245,158,11,0.72)" : "rgba(15,23,42,0.5)");
-    ctx.globalAlpha = 0.9;
-    ctx.fillStyle = driftGrad;
-    ctx.strokeStyle = touch.driftActive ? "#ffd447" : "#ffffff";
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
     ctx.beginPath();
-    ctx.arc(drift.x, drift.y, drift.radius, 0, Math.PI * 2);
+    ctx.arc(touch.steer.knobX - 6, touch.steer.knobY - 7, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255,255,255,0.82)";
+    ctx.font = "900 10px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("STEER", steer.x, steer.y + plateRadius + 16);
+
+    ctx.shadowColor = "rgba(15,23,42,0.36)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 8;
+    const driftPlateRadius = drift.radius + 14;
+    const driftGrad = ctx.createRadialGradient(drift.x, drift.y, 8, drift.x, drift.y, driftPlateRadius);
+    driftGrad.addColorStop(0, touch.driftActive ? "rgba(255,226,104,0.92)" : "rgba(42,58,78,0.9)");
+    driftGrad.addColorStop(0.62, touch.driftActive ? "rgba(245,158,11,0.84)" : "rgba(18,28,45,0.78)");
+    driftGrad.addColorStop(1, touch.driftActive ? "rgba(111,72,12,0.78)" : "rgba(12,20,34,0.74)");
+    ctx.fillStyle = driftGrad;
+    ctx.strokeStyle = touch.driftActive ? "#fff2a8" : "rgba(255,212,71,0.34)";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(drift.x, drift.y, driftPlateRadius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    ctx.globalAlpha = 0.8;
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `800 ${w < 520 ? 12 : 13}px system-ui, sans-serif`;
+    ctx.shadowColor = "transparent";
+    ctx.strokeStyle = touch.driftActive ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.2)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(drift.x, drift.y, drift.radius * 0.62, -0.25, Math.PI * 1.28);
+    ctx.stroke();
+    ctx.fillStyle = touch.driftActive ? "#213547" : "#ffffff";
+    ctx.font = `900 ${w < 520 ? 13 : 15}px system-ui, sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("DRIFT", drift.x, drift.y + 4);
+    ctx.fillText("DRIFT", drift.x, drift.y + 5);
+
+    ctx.fillStyle = touch.driftActive ? "#213547" : "#ffd447";
+    ctx.beginPath();
+    ctx.moveTo(drift.x - 4, drift.y - 30);
+    ctx.lineTo(drift.x + 9, drift.y - 30);
+    ctx.lineTo(drift.x + 1, drift.y - 15);
+    ctx.lineTo(drift.x + 13, drift.y - 15);
+    ctx.lineTo(drift.x - 6, drift.y + 10);
+    ctx.lineTo(drift.x - 1, drift.y - 8);
+    ctx.lineTo(drift.x - 12, drift.y - 8);
+    ctx.closePath();
+    ctx.fill();
+
     ctx.textAlign = "start";
-    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   private drawRotateOverlay(ctx: CanvasRenderingContext2D, w: number, h: number): void {
