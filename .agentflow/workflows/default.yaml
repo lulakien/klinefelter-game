@@ -1,0 +1,49 @@
+version: 1
+name: default
+description: "One-goal implementation workflow with review, judge, fix loop, and commit."
+maxFixAttempts: 2
+stages:
+  - id: select-goal
+    type: agent
+    role: planner
+    thinking: normal
+    template: goal-select.md
+    output: goal-json
+    required: true
+  - id: build
+    type: agent
+    role: builder
+    thinking: deep
+    template: build.md
+    output: markdown
+    required: true
+  - id: checks
+    type: checks
+    required: true
+  - id: review
+    type: review
+    reviewers:
+      - id: general-review
+        role: reviewer
+        thinking: normal
+        template: review.md
+        required: true
+  - id: judge
+    type: agent
+    role: judge
+    thinking: deep
+    template: judge.md
+    output: verdict-json
+    required: true
+  - id: fix
+    type: agent
+    role: fixer
+    thinking: deep
+    template: fix.md
+    runWhen: judge-needs-fixes
+    output: markdown
+    required: true
+  - id: commit
+    type: commit
+    runWhen: approved
+    required: true

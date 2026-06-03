@@ -1,0 +1,17 @@
+# Runtime state — do not commit
+runs/
+memory/
+reports/
+logs/
+state/
+
+# Lock files
+*.lock
+
+# Vim/editor swap files
+.*.swp
+.*.swo
+*~
+
+# Generated artifacts
+*.tmp

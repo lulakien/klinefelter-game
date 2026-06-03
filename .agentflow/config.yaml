@@ -1,0 +1,42 @@
+version: 1
+project:
+  name: "klinefelter-game"
+  allowedBranches: [master]
+  requireCleanWorkingTree: true
+documents:
+  roots: [documents]
+  include: ["**/*.md", "**/*.mdx", "**/*.txt", "**/*.yaml", "**/*.yml", "**/*.json"]
+  exclude: ["**/node_modules/**", "**/.git/**", "**/.agentflow/**", "**/dist/**", "**/build/**", "**/coverage/**"]
+  maxFileBytes: 250000
+  modifyPolicy: read-only
+protectedFiles:
+  enabled: true
+  autoRestore: true
+  patterns:
+    - "documents/**"
+    - ".env"
+    - ".env.*"
+    - "**/*.pem"
+    - "**/*.key"
+    - "CLAUDE.md"
+    - "AGENTS.md"
+    - "DESIGN.md"
+    - "HANDOFF.md"
+    - "PROJECT.txt"
+    - "README.md"
+checks:
+  requireAtLeastOne: false
+  commands:
+    - name: git-diff-check
+      command: git
+      args: ["diff", "--check"]
+      required: true
+git:
+  commit:
+    enabled: true
+    messageTemplate: "agentflow: {{goal.title}}\n\nGoal: {{goal.id}}\nRun: {{run.id}}\nVerdict: {{judge.verdict}}"
+  push: false
+defaults:
+  workflow: default
+  agentProfile: example
+  maxFixAttempts: 2

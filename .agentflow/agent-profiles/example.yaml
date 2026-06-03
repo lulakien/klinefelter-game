@@ -1,0 +1,53 @@
+version: 1
+thinkingLevels:
+  quick:
+    description: "Fast, cheap, shallow reasoning."
+    promptHint: "Use concise reasoning. Focus only on the requested stage."
+  normal:
+    description: "Balanced reasoning."
+    promptHint: "Reason carefully enough to avoid obvious mistakes."
+  deep:
+    description: "Higher-effort reasoning for hard implementation, judging, or debugging."
+    promptHint: "Use deeper analysis. Check assumptions, edge cases, and failure modes."
+agents:
+  planner-agent:
+    command: "echo"
+    args: ["Planner placeholder. Replace this command in .agentflow/agent-profiles/example.yaml"]
+    cwd: "{{projectRoot}}"
+    promptDelivery: stdin
+    successExitCodes: [0]
+    thinkingArgMap: { quick: [], normal: [], deep: [] }
+  builder-agent:
+    command: "echo"
+    args: ["Builder placeholder. Replace this command in .agentflow/agent-profiles/example.yaml"]
+    cwd: "{{projectRoot}}"
+    promptDelivery: stdin
+    successExitCodes: [0]
+    thinkingArgMap: { quick: [], normal: [], deep: [] }
+  reviewer-agent:
+    command: "echo"
+    args: ["Reviewer placeholder. Replace this command in .agentflow/agent-profiles/example.yaml"]
+    cwd: "{{projectRoot}}"
+    promptDelivery: stdin
+    successExitCodes: [0]
+    thinkingArgMap: { quick: [], normal: [], deep: [] }
+  judge-agent:
+    command: "echo"
+    args: ["Judge placeholder. Replace this command in .agentflow/agent-profiles/example.yaml"]
+    cwd: "{{projectRoot}}"
+    promptDelivery: stdin
+    successExitCodes: [0]
+    thinkingArgMap: { quick: [], normal: [], deep: [] }
+  fixer-agent:
+    command: "echo"
+    args: ["Fixer placeholder. Replace this command in .agentflow/agent-profiles/example.yaml"]
+    cwd: "{{projectRoot}}"
+    promptDelivery: stdin
+    successExitCodes: [0]
+    thinkingArgMap: { quick: [], normal: [], deep: [] }
+roles:
+  planner: planner-agent
+  builder: builder-agent
+  reviewer: reviewer-agent
+  judge: judge-agent
+  fixer: fixer-agent
