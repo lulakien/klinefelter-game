@@ -15,7 +15,7 @@ interface Puzzle15State {
   bestMoves: number;
   won: boolean;
   scoreSubmitted: boolean;
-  startedAt: number;
+  startedAt: number | null;
   elapsedSeconds: number;
   design: number;
 }
@@ -35,7 +35,7 @@ export function createPuzzle15Game(): Puzzle15State {
     bestMoves: getPersonalBest("15-puzzle")?.score ?? 0,
     won: false,
     scoreSubmitted: false,
-    startedAt: Date.now(),
+    startedAt: null,
     elapsedSeconds: 0,
     design: Math.floor(Math.random() * DESIGNS.length),
   };
@@ -74,6 +74,7 @@ function isSolved(tiles: number[]): boolean {
 
 function getElapsedSeconds(state: Puzzle15State): number {
   if (state.won) return state.elapsedSeconds;
+  if (state.startedAt === null) return 0;
   return Math.floor((Date.now() - state.startedAt) / 1000);
 }
 
@@ -87,6 +88,8 @@ export class Puzzle15Renderer {
   private container: HTMLElement | null = null;
   private state: Puzzle15State;
   private timerInterval: ReturnType<typeof setInterval> | null = null;
+  private swipeStart: { index: number; x: number; y: number; pointerId: number } | null = null;
+  private suppressClickIndex: number | null = null;
 
   constructor(state: Puzzle15State) {
     this.state = state;
@@ -120,6 +123,9 @@ export class Puzzle15Renderer {
       return;
     }
 
+    if (this.state.startedAt === null) {
+      this.state.startedAt = Date.now();
+    }
     [this.state.tiles[emptyIndex], this.state.tiles[index]] = [this.state.tiles[index], this.state.tiles[emptyIndex]];
     this.state.moves++;
     this.state.won = isSolved(this.state.tiles);
@@ -163,8 +169,62 @@ export class Puzzle15Renderer {
 
     this.container.querySelector("#p15-restart")?.addEventListener("click", () => this.restart());
     this.container.querySelectorAll<HTMLElement>(".puzzle-15__tile").forEach((tileEl) => {
-      tileEl.addEventListener("click", () => this.moveTile(Number(tileEl.dataset.index)));
+      tileEl.addEventListener("click", () => {
+        const index = Number(tileEl.dataset.index);
+        if (this.suppressClickIndex === index) {
+          this.suppressClickIndex = null;
+          return;
+        }
+        this.moveTile(index);
+      });
+      tileEl.addEventListener("pointerdown", (e) => this.onTilePointerDown(e, tileEl));
+      tileEl.addEventListener("pointerup", (e) => this.onTilePointerUp(e));
+      tileEl.addEventListener("pointercancel", () => {
+        this.swipeStart = null;
+      });
     });
+  }
+
+  private onTilePointerDown(e: PointerEvent, tileEl: HTMLElement): void {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    this.swipeStart = {
+      index: Number(tileEl.dataset.index),
+      x: e.clientX,
+      y: e.clientY,
+      pointerId: e.pointerId,
+    };
+    tileEl.setPointerCapture(e.pointerId);
+  }
+
+  private onTilePointerUp(e: PointerEvent): void {
+    if (!this.swipeStart || this.swipeStart.pointerId !== e.pointerId) return;
+    const start = this.swipeStart;
+    this.swipeStart = null;
+
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance < 22) return;
+
+    const emptyIndex = this.state.tiles.indexOf(EMPTY);
+    if (!adjacentIndices(emptyIndex).includes(start.index)) return;
+
+    const row = Math.floor(start.index / SIZE);
+    const col = start.index % SIZE;
+    const emptyRow = Math.floor(emptyIndex / SIZE);
+    const emptyCol = emptyIndex % SIZE;
+    const horizontal = Math.abs(dx) > Math.abs(dy);
+    const swipedTowardEmpty =
+      (horizontal && emptyCol < col && dx < -18) ||
+      (horizontal && emptyCol > col && dx > 18) ||
+      (!horizontal && emptyRow < row && dy < -18) ||
+      (!horizontal && emptyRow > row && dy > 18);
+
+    if (!swipedTowardEmpty) return;
+
+    e.preventDefault();
+    this.suppressClickIndex = start.index;
+    this.moveTile(start.index);
   }
 
   private renderTile(tile: number, index: number): string {

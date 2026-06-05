@@ -154,6 +154,7 @@ interface DragState {
   offsetY: number;
   anchorOffsetRow: number;
   anchorOffsetCol: number;
+  liftY: number;
 }
 
 export class BlockBlastRenderer {
@@ -274,6 +275,11 @@ export class BlockBlastRenderer {
     const maxCol = Math.max(...shape.cells.map(([, c]) => c));
     const anchorOffsetCol = Math.min(maxCol, Math.max(minCol, Math.round(offsetX / miniSize - 0.5)));
     const anchorOffsetRow = Math.min(maxRow, Math.max(minRow, Math.round(offsetY / miniSize - 0.5)));
+    const board = this.container?.querySelector("#bb-board") as HTMLElement | null;
+    const boardCell = board?.querySelector<HTMLElement>(".block-blast__cell");
+    const liftY = e.pointerType === "mouse"
+      ? 0
+      : Math.round((boardCell?.getBoundingClientRect().height ?? 34) * 3.5);
 
     // Create a shape-only ghost so the tray card remains intact.
     const ghost = document.createElement("div");
@@ -281,7 +287,7 @@ export class BlockBlastRenderer {
     ghost.innerHTML = this.renderShape(shape);
     ghost.style.position = "fixed";
     ghost.style.left = `${rect.left}px`;
-    ghost.style.top = `${rect.top}px`;
+    ghost.style.top = `${rect.top - liftY}px`;
     ghost.style.pointerEvents = "none";
     ghost.style.zIndex = "9999";
     ghost.style.opacity = "0.9";
@@ -289,7 +295,7 @@ export class BlockBlastRenderer {
     ghost.style.transition = "none";
     document.body.appendChild(ghost);
 
-    this.drag = { shapeIndex, ghost, offsetX, offsetY, anchorOffsetRow, anchorOffsetCol };
+    this.drag = { shapeIndex, ghost, offsetX, offsetY, anchorOffsetRow, anchorOffsetCol, liftY };
     el.setPointerCapture(e.pointerId);
 
     window.addEventListener("pointermove", this.boundOnMove);
@@ -300,9 +306,9 @@ export class BlockBlastRenderer {
     if (!this.drag) return;
     e.preventDefault();
 
-    const { ghost, offsetX, offsetY } = this.drag;
+    const { ghost, offsetX, offsetY, liftY } = this.drag;
     ghost.style.left = `${e.clientX - offsetX}px`;
-    ghost.style.top = `${e.clientY - offsetY}px`;
+    ghost.style.top = `${e.clientY - offsetY - liftY}px`;
 
     this.updateBoardPreview(e.clientX, e.clientY);
   }
@@ -378,18 +384,33 @@ export class BlockBlastRenderer {
 
   private getDropAnchor(board: HTMLElement, clientX: number, clientY: number): { row: number; col: number } | null {
     if (!this.drag) return null;
+    const aimX = clientX;
+    const aimY = clientY - this.drag.liftY;
     const boardRect = board.getBoundingClientRect();
     if (
-      clientX < boardRect.left ||
-      clientX > boardRect.right ||
-      clientY < boardRect.top ||
-      clientY > boardRect.bottom
+      aimX < boardRect.left ||
+      aimX > boardRect.right ||
+      aimY < boardRect.top ||
+      aimY > boardRect.bottom
     ) {
       return null;
     }
-    const cellSize = boardRect.width / SIZE;
-    const pointerCol = Math.floor((clientX - boardRect.left) / cellSize);
-    const pointerRow = Math.floor((clientY - boardRect.top) / cellSize);
+    const firstCell = board.querySelector<HTMLElement>(".block-blast__cell");
+    const secondCell = board.querySelector<HTMLElement>('[data-row="0"][data-col="1"]');
+    const belowCell = board.querySelector<HTMLElement>('[data-row="1"][data-col="0"]');
+    if (!firstCell) return null;
+
+    const firstRect = firstCell.getBoundingClientRect();
+    const secondRect = secondCell?.getBoundingClientRect();
+    const belowRect = belowCell?.getBoundingClientRect();
+    const cellWidth = firstRect.width;
+    const cellHeight = firstRect.height;
+    const gapX = secondRect ? Math.max(0, secondRect.left - firstRect.right) : 0;
+    const gapY = belowRect ? Math.max(0, belowRect.top - firstRect.bottom) : gapX;
+    const pointerCol = Math.floor((aimX - firstRect.left + gapX / 2) / (cellWidth + gapX));
+    const pointerRow = Math.floor((aimY - firstRect.top + gapY / 2) / (cellHeight + gapY));
+    if (pointerRow < 0 || pointerRow >= SIZE || pointerCol < 0 || pointerCol >= SIZE) return null;
+
     return {
       row: pointerRow - this.drag.anchorOffsetRow,
       col: pointerCol - this.drag.anchorOffsetCol,

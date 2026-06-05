@@ -198,7 +198,6 @@ function floodReveal(state: GameState, row: number, col: number): void {
 /** Toggle flag on a cell. Returns true if state changed. */
 export function toggleFlag(state: GameState, row: number, col: number): boolean {
   if (state.gameOver) return false;
-  if (!state.started) return false;
 
   const cell = state.grid[row]?.[col];
   if (!cell) return false;
@@ -305,8 +304,18 @@ export class MinesweeperRenderer {
   private state: GameState;
   private timerInterval: ReturnType<typeof setInterval> | null = null;
 
-  // Touch handling for long-press flag
-  private touchStartTimer: ReturnType<typeof setTimeout> | null = null;
+  // Pointer handling for tap, scroll-cancel, and long-press flag.
+  private pressTimer: ReturnType<typeof setTimeout> | null = null;
+  private pressGesture: {
+    pointerId: number;
+    row: number;
+    col: number;
+    x: number;
+    y: number;
+    longPressed: boolean;
+  } | null = null;
+  private suppressClickKey: string | null = null;
+  private suppressClickUntil = 0;
 
   // Bound handlers
   private onContextMenu: (e: Event) => void;
@@ -333,10 +342,7 @@ export class MinesweeperRenderer {
 
   destroy(): void {
     if (this.timerInterval) clearInterval(this.timerInterval);
-    if (this.touchStartTimer) {
-      clearTimeout(this.touchStartTimer);
-      this.touchStartTimer = null;
-    }
+    this.clearPressTimer();
     if (this.container) {
       this.container.removeEventListener("contextmenu", this.onContextMenu);
     }
@@ -369,36 +375,82 @@ export class MinesweeperRenderer {
     }
   }
 
-  // Touch: tap = reveal, long-press = flag
-  private handleTouchStart(row: number, col: number): void {
-    this.touchStartTimer = setTimeout(() => {
-      this.handleCellRightClick(row, col);
-      this.touchStartTimer = null;
-      if ("vibrate" in navigator) {
-        navigator.vibrate(15);
+  // Touch/pen: tap = reveal, long-press = flag, move = let the board scroll.
+  private handlePointerDown(e: PointerEvent, row: number, col: number): void {
+    if (e.pointerType === "mouse") return;
+    this.clearPressTimer();
+    this.pressGesture = {
+      pointerId: e.pointerId,
+      row,
+      col,
+      x: e.clientX,
+      y: e.clientY,
+      longPressed: false,
+    };
+    this.pressTimer = setTimeout(() => {
+      const gesture = this.pressGesture;
+      if (!gesture || gesture.pointerId !== e.pointerId) return;
+      gesture.longPressed = true;
+      this.suppressSyntheticClick(row, col);
+      const changed = toggleFlag(this.state, row, col);
+      if (changed) {
+        playSfx("hit");
+        if ("vibrate" in navigator) navigator.vibrate(15);
+        this.clearPressTimer();
+        this.render();
       }
-    }, 400);
+    }, 430);
   }
 
-  private handleTouchEnd(row: number, col: number): void {
-    if (this.touchStartTimer) {
-      clearTimeout(this.touchStartTimer);
-      this.touchStartTimer = null;
-      // Short tap = reveal (or chord if already revealed)
-      const cell = this.state.grid[row]?.[col];
-      if (cell?.revealed && cell.adjacentMines > 0) {
-        this.handleCellChord(row, col);
-      } else {
-        this.handleCellClick(row, col);
-      }
+  private handlePointerMove(e: PointerEvent): void {
+    const gesture = this.pressGesture;
+    if (!gesture || gesture.pointerId !== e.pointerId || gesture.longPressed) return;
+    if (Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y) > 10) {
+      this.clearPressTimer();
+      this.pressGesture = null;
     }
   }
 
-  private handleTouchMove(): void {
-    if (this.touchStartTimer) {
-      clearTimeout(this.touchStartTimer);
-      this.touchStartTimer = null;
+  private handlePointerUp(e: PointerEvent, row: number, col: number): void {
+    const gesture = this.pressGesture;
+    if (!gesture || gesture.pointerId !== e.pointerId) return;
+    const wasLongPress = gesture.longPressed;
+    this.clearPressTimer();
+    this.pressGesture = null;
+
+    if (wasLongPress) {
+      e.preventDefault();
+      this.suppressSyntheticClick(row, col);
+      return;
     }
+
+    e.preventDefault();
+    this.suppressSyntheticClick(row, col);
+    const cell = this.state.grid[row]?.[col];
+    if (cell?.revealed && cell.adjacentMines > 0) {
+      this.handleCellChord(row, col);
+    } else {
+      this.handleCellClick(row, col);
+    }
+  }
+
+  private handlePointerCancel(e: PointerEvent): void {
+    if (this.pressGesture?.pointerId === e.pointerId) {
+      this.clearPressTimer();
+      this.pressGesture = null;
+    }
+  }
+
+  private clearPressTimer(): void {
+    if (this.pressTimer) {
+      clearTimeout(this.pressTimer);
+      this.pressTimer = null;
+    }
+  }
+
+  private suppressSyntheticClick(row: number, col: number): void {
+    this.suppressClickKey = `${row},${col}`;
+    this.suppressClickUntil = Date.now() + 700;
   }
 
   restart(): void {
@@ -521,11 +573,14 @@ export class MinesweeperRenderer {
     // Cell events
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        const el = this.container.querySelector(`#cell-${r}-${c}`);
+        const el = this.container.querySelector<HTMLElement>(`#cell-${r}-${c}`);
         if (!el) continue;
 
         el.addEventListener("click", (e) => {
           e.preventDefault();
+          if (this.suppressClickKey === `${r},${c}` && Date.now() < this.suppressClickUntil) {
+            return;
+          }
           const cell = this.state.grid[r][c];
           if (cell?.revealed && cell.adjacentMines > 0) {
             this.handleCellChord(r, c);
@@ -539,18 +594,10 @@ export class MinesweeperRenderer {
           this.handleCellRightClick(r, c);
         });
 
-        el.addEventListener("touchstart", () => {
-          this.handleTouchStart(r, c);
-        });
-
-        el.addEventListener("touchend", (e) => {
-          e.preventDefault();
-          this.handleTouchEnd(r, c);
-        });
-
-        el.addEventListener("touchmove", () => {
-          this.handleTouchMove();
-        });
+        el.addEventListener("pointerdown", (e) => this.handlePointerDown(e, r, c));
+        el.addEventListener("pointermove", (e) => this.handlePointerMove(e));
+        el.addEventListener("pointerup", (e) => this.handlePointerUp(e, r, c));
+        el.addEventListener("pointercancel", (e) => this.handlePointerCancel(e));
       }
     }
   }
