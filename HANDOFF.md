@@ -1,6 +1,6 @@
 # Klinefelter Game — Project Handoff
 
-Built 2026-06-02. Vite + TypeScript + Vanilla TS. No React. No external CDNs. No backend.
+Built 2026-06-02. Updated 2026-06-05. Vite + TypeScript + Vanilla TS. No React. No external CDNs. No backend.
 
 **Live:** https://lulakien.github.io/klinefelter-game/
 
@@ -10,10 +10,10 @@ Built 2026-06-02. Vite + TypeScript + Vanilla TS. No React. No external CDNs. No
 
 ```
   User opens URL → index.html
-    → app shell mounts (top bar + content area)
+    → app shell mounts (warm cocoa top bar + content area)
     → SW registers (Workbox, precaches 12 app-shell files)
     → Router starts (hash-based: #/, #/games/:id, #/settings, #/offline)
-    → Home screen renders game cards from registry
+    → Home screen renders 6 game cards from registry
     → Click a card → hash changes → router dispatches
       → game-screen.ts dynamically imports the game chunk
       → game mounts into the content area
@@ -55,9 +55,9 @@ src/
     offline-manager-ui.ts        Shared UI helpers (formatBytes, statusBadge)
 
   games/
-    car-arena/                   🚗 Canvas car game (~27 KB / 8.3 KB gzip)
+    car-arena/                   🚗 Tiny Drift Karts — top-down go-kart racing (~27 KB / 8.3 KB gzip)
       index.ts                   Entry, cleanup lifecycle
-      car-game.ts                Orchestrator: loop, phases, scoring
+      car-game.ts                Orchestrator: loop, phases, scoring, checkpoints
       physics/
         car-physics.ts           Arcade physics (accel, brake, steer, drift, grip)
         collision.ts             Circle/AABB collision detection & response
@@ -67,9 +67,9 @@ src/
       input/
         input-manager.ts         Unified keyboard + touch → normalized actions
       bots/
-        bot.ts                   Wander, chaser, coward, bumper AI
+        bot.ts                   Wander, chaser, coward, bumper AI with racing lines
       arena.ts                   2000×1400 arena with obstacles & token spawns
-      scoring.ts                 Tokens, bot bumps, drift chain, 90s rounds
+      scoring.ts                 Tokens, bot bumps, drift chain, lap racing
 
     2048/                        🔢 CSS grid tile puzzle (~6.7 KB / 2.5 KB gzip)
       index.ts                   Entry & cleanup
@@ -78,6 +78,18 @@ src/
     minesweeper/                 💣 CSS grid puzzle (~6.1 KB / 2.2 KB gzip)
       index.ts                   Entry & cleanup
       game-minesweeper.ts        Logic, DOM renderer, long-press flag, chord
+
+    solitaire/                   🃏 Klondike solitaire (~5 KB / 1.8 KB gzip)
+      index.ts                   Entry & cleanup
+      solitaire.ts               Draw-one stock, tableau stacks, foundations
+
+    water-sort/                  🧪 Color sorting puzzle (~4 KB / 1.5 KB gzip)
+      index.ts                   Entry & cleanup
+      water-sort.ts              Tap-to-pour, procedural level generation
+
+    block-blast/                 🧊 Block placement puzzle (~5 KB / 1.8 KB gzip)
+      index.ts                   Entry & cleanup
+      block-blast.ts             8×8 grid, 3 shapes at a time, row/column clear
 
   core/events/
     emitter.ts                   Typed event emitter (lightweight pub/sub)
@@ -98,11 +110,14 @@ public/
 
 | Chunk | Raw | Gzip | Target |
 |-------|-----|------|--------|
-| App shell CSS | 11.3 KB | 2.5 KB | 20-80 KB |
+| App shell CSS | 10.8 KB | 2.4 KB | 20-80 KB |
 | App shell JS | 20.4 KB | 6.3 KB | 100-250 KB |
-| Car Arena (lazy) | 27.0 KB | 8.3 KB | <2 MB |
+| Tiny Drift Karts (lazy) | 27.0 KB | 8.3 KB | <2 MB |
 | 2048 (lazy) | 6.7 KB | 2.5 KB | <1 MB |
 | Minesweeper (lazy) | 6.1 KB | 2.2 KB | <1 MB |
+| Solitaire (lazy) | ~5 KB | ~1.8 KB | <1 MB |
+| Water Sort (lazy) | ~4 KB | ~1.5 KB | <1 MB |
+| Block Blast (lazy) | ~5 KB | ~1.8 KB | <1 MB |
 | SW precache | 12 files, ~71 KB | — | — |
 
 No external CDNs, fonts, analytics, or UI frameworks.
@@ -129,29 +144,33 @@ No external CDNs, fonts, analytics, or UI frameworks.
 
 ## What Works
 
-- ✅ Home screen loads, shows 3 game cards with live cache status
-- ✅ All 3 games are playable (car arena, 2048, minesweeper)
-- ✅ Settings screen: quality mode toggle (persists), audio prefs, data display
+- ✅ Home screen loads, shows 6 game cards with live cache status
+- ✅ All 6 games are playable (Tiny Drift Karts, 2048, minesweeper, solitaire, water sort, block blast)
+- ✅ Warm toy-arcade visual design: coral/peach backgrounds, cocoa top bar, thick borders, rounded shapes
+- ✅ Settings screen: quality mode toggle (persists), audio prefs, data display, nickname
 - ✅ Offline manager: real SW status, connection state, storage estimate, download/remove buttons
 - ✅ PWA: service worker, manifest, app shell precached for offline
 - ✅ Lazy loading: each game in its own chunk, loaded only on navigation
 - ✅ Code splitting verified in production build
 - ✅ GitHub Actions auto-deploys on push to master
 - ✅ Game cleanup: navigating away stops rAF, removes listeners, detaches canvas
+- ✅ Personal bests: per-game scores persisted in localStorage with nickname and date
+- ✅ Mobile touch controls: refined joystick, steering, and button layouts
 
 ## Known Issues / What's Not Built
 
-- **Visual polish:** The app "looks awful" per user feedback. The CSS is functional but bare — dark theme with accent colors, no animations beyond game-specific ones, minimal spacing/typography refinement. This needs a design pass.
-- **iOS install instructions:** No "Add to Home Screen" banner for Safari. Chrome on Android gets `beforeinstallprompt` but iOS needs manual instructions.
-- **Mobile touch tuning:** The car game touch controls exist but haven't been tested on real devices. The virtual joystick zone and button placement may need adjustment.
+- **Visual polish:** ✅ COMPLETED. The warm toy-arcade design system is fully integrated — coral/peach backgrounds, cocoa top bar, thick dark borders, rounded shapes, push-down buttons, system fonts. CSS consolidated from dark cyber theme + overrides into a single warm design.
+- **iOS install instructions:** No "Add to Home Screen" banner for Safari. iOS instructions modal exists but needs testing on real devices.
+- **Mobile touch tuning:** Touch controls refined across several commits but haven't been tested on real devices.
 - **Car physics tuning:** Constants are set to reasonable defaults. Real playtesting will reveal whether acceleration, grip, drift, and turn rate feel good.
 - **Per-game asset manifests:** The package manager downloads by loading the game module (which the SW caches). Real per-game asset manifests with versioned packages, progress UI, and low/high quality asset selection are not built (deferred per PROJECT.txt Phase 2+).
 - **Online multiplayer / rooms:** No backend exists. This is intentional — PROJECT.txt defers this to Phase 4+.
 - **Same-device multiplayer:** Not built (Phase 3).
-- **More games:** Snake, Memory, Solitaire, Checkers, Backgammon are planned but not built (Phase 2).
+- **More games:** Memory is planned but not built. Snake, Solitaire, Water Sort, and Block Blast completed (Phase 2).
 - **E2E / performance tests:** Not built.
 - **Bundle size CI checks:** Not built.
 - **`offline-manager-ui.ts`:** Contains `createActionButton` which is exported but unused. The offline screen builds its own buttons inline. Safe to remove or refactor.
+- **Build issue:** `@rollup/rollup-linux-x64-gnu` missing on Node v22. Run `npm i` to restore. Known npm optional dependency bug.
 
 ## Deployment
 
@@ -180,9 +199,9 @@ npm run preview  # Serve the production build locally
 
 ## Next Steps (from PROJECT.txt)
 
-1. **Visual design pass** — the most impactful next step given user feedback
+1. ~~**Visual design pass** — the most impactful next step given user feedback~~ ✅ DONE
 2. **Real device testing** — car game touch controls, PWA install flow on iOS/Android
-3. **Phase 2:** More singleplayer games (Snake, Memory, Solitaire-lite)
+3. **Phase 2 complete:** Add Snake and Memory games
 4. **Phase 3:** Same-device multiplayer (checkers, backgammon, pass-and-play)
 5. **Phase 4:** Online room system (backend, WebSocket, room codes)
 6. **Phase 5:** Werewolf/Vampire Village social deduction game

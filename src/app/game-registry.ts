@@ -107,6 +107,22 @@ const registry: GameMeta[] = [
     entryModule: "../games/block-blast/index.js",
     tags: ["singleplayer", "offline", "puzzle", "high-score"],
   },
+  {
+    id: "snake",
+    name: "Snake",
+    description: "Classic snake — eat food, grow longer, avoid walls and yourself!",
+    version: "0.1.0",
+    offlineSupport: "full",
+    multiplayerSupport: "none",
+    estimatedSizeLow: 60_000,
+    estimatedSizeHigh: 150_000,
+    supportsUltraLow: true,
+    supportsHighQuality: true,
+    controls: ["keyboard", "touch"],
+    requiresBackend: false,
+    entryModule: "../games/snake/index.js",
+    tags: ["singleplayer", "offline", "arcade", "classic", "high-score"],
+  },
 ];
 
 /** Get all registered games. */
@@ -134,4 +150,5 @@ export const GAME_LOADERS: Record<string, () => Promise<any>> = {
   "solitaire": () => import(/* viteChunkName: "game-solitaire" */ "../games/solitaire/index.js"),
   "water-sort": () => import(/* viteChunkName: "game-water-sort" */ "../games/water-sort/index.js"),
   "block-blast": () => import(/* viteChunkName: "game-block-blast" */ "../games/block-blast/index.js"),
+  "snake": () => import(/* viteChunkName: "game-snake" */ "../games/snake/index.js"),
 };
