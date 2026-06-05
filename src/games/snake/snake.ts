@@ -380,8 +380,8 @@ export class SnakeRenderer {
   }
 
   private updateUI(): void {
-    const scoreEl = document.getElementById("snake-score");
-    const bestEl = document.getElementById("snake-best");
+    const scoreEl = this.container?.querySelector("#snake-score");
+    const bestEl = this.container?.querySelector("#snake-best");
     if (scoreEl) scoreEl.textContent = `Score: ${this.state.score}`;
     if (bestEl) bestEl.textContent = `Best: ${this.state.bestScore}`;
   }

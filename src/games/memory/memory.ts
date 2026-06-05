@@ -121,8 +121,8 @@ export class MemoryRenderer {
     container.appendChild(wrapper);
 
     // Cache refs
-    this.movesEl = document.getElementById("mem-moves");
-    this.bestEl = document.getElementById("mem-best");
+    this.movesEl = this.container?.querySelector("#mem-moves") ?? null;
+    this.bestEl = this.container?.querySelector("#mem-best") ?? null;
   }
 
   destroy(): void {
