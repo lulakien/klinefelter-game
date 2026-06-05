@@ -38,6 +38,9 @@ export default defineConfig({
           if (id.includes("games/tic-tac-toe/")) {
             return "game-tic-tac-toe";
           }
+          if (id.includes("games/connect-four/")) {
+            return "game-connect-four";
+          }
         },
       },
     },

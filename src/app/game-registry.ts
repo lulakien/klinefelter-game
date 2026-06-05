@@ -155,6 +155,22 @@ const registry: GameMeta[] = [
     entryModule: "../games/tic-tac-toe/index.js",
     tags: ["multiplayer", "same-device", "offline", "classic", "board"],
   },
+  {
+    id: "connect-four",
+    name: "Connect Four",
+    description: "Drop discs to connect four in a row. Same-device or vs AI.",
+    version: "0.1.0",
+    offlineSupport: "full",
+    multiplayerSupport: "same-device",
+    estimatedSizeLow: 35_000,
+    estimatedSizeHigh: 90_000,
+    supportsUltraLow: true,
+    supportsHighQuality: true,
+    controls: ["touch", "keyboard"],
+    requiresBackend: false,
+    entryModule: "../games/connect-four/index.js",
+    tags: ["multiplayer", "same-device", "offline", "classic", "board"],
+  },
 ];
 
 /** Get all registered games. */
@@ -185,4 +201,5 @@ export const GAME_LOADERS: Record<string, () => Promise<any>> = {
   "snake": () => import(/* viteChunkName: "game-snake" */ "../games/snake/index.js"),
   "memory": () => import(/* viteChunkName: "game-memory" */ "../games/memory/index.js"),
   "tic-tac-toe": () => import(/* viteChunkName: "game-tic-tac-toe" */ "../games/tic-tac-toe/index.js"),
+  "connect-four": () => import(/* viteChunkName: "game-connect-four" */ "../games/connect-four/index.js"),
 };
