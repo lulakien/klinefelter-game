@@ -88,6 +88,9 @@ src/
       water-sort.ts              Tap-to-pour, procedural level generation
 
     block-blast/                 🧊 Block placement puzzle (~5 KB / 1.8 KB gzip)
+    snake/                       🐍 Classic snake (~7.5 KB / 2.7 KB gzip)
+    memory/                      🧠 Card matching (~4.5 KB / 1.7 KB gzip)
+    tic-tac-toe/                 ⭕ X and O pass-and-play with AI (~5.8 KB / 2.0 KB gzip)
       index.ts                   Entry & cleanup
       block-blast.ts             8×8 grid, 3 shapes at a time, row/column clear
 
@@ -118,11 +121,36 @@ public/
 | Solitaire (lazy) | ~5 KB | ~1.8 KB | <1 MB |
 | Water Sort (lazy) | ~4 KB | ~1.5 KB | <1 MB |
 | Block Blast (lazy) | ~5 KB | ~1.8 KB | <1 MB |
+| Snake (lazy) | ~7 KB | ~2.6 KB | <1 MB |
+| Memory (lazy) | ~4.5 KB | ~1.7 KB | <1 MB |
+| Tic-Tac-Toe (lazy) | ~5.8 KB | ~2.0 KB | <1 MB |
 | SW precache | 12 files, ~71 KB | — | — |
 
 No external CDNs, fonts, analytics, or UI frameworks.
 
 ## BUGFIXES Applied
+
+### Session 2026-06-05 (12 bugs fixed + Tic-Tac-Toe added)
+- **Memory missing Back to Home:** Added to main actions and win overlay; fixed New Best showing on ties.
+- **Snake missing Back to Home:** Added button below canvas; fixed touch swipe reference point drift on touchmove.
+- **scores-store compareScores:** Added "memory" and "car-arena" to lower-is-better list.
+- **Minesweeper timer leak:** `touchStartTimer` and `timerInterval` not cleared on restart/difficulty change.
+- **Memory timeout leak:** `flipTimeout` not tracked or cleared on destroy; DOM queries now scoped to container.
+- **2048 overflow:** Index entry set overflow to "auto" instead of "hidden"; added Keep Playing button on win.
+- **Snake reset timestamp:** `lastTimestamp` not reset, causing a massive dt spike after restart.
+- **2048 overlay blocking:** Overlay was `position: absolute` without a positioned parent, covering the viewport and blocking restart/home buttons.
+- **Home screen async error:** `updateGameCardStatus` didn't catch errors from `getGameOfflineStatus`.
+- **Missing manual chunks:** Snake and Memory not listed in vite.config.ts manualChunks.
+- **Theme color drift:** index.html, manifest.webmanifest, and vite PWA manifest still used old dark theme colors.
+- **Minesweeper no difficulty levels:** Added Beginner (9×9, 10), Intermediate (16×16, 40), Expert (16×30, 99).
+- **Water Sort no stuck detection:** Added `gameOver` when no moves remain.
+- **Block Blast initial dead end:** Added `hasMove` check on mount so game over shows immediately if initial shapes cannot be placed.
+- **Car Arena resize every frame:** `resize()` called unconditionally in game loop; now only runs when canvas dimensions actually changed.
+- **2048 / Minesweeper document queries:** Restart buttons queried via `document.getElementById` instead of scoped container query.
+- **Tic-Tac-Toe win line:** Winning cells not highlighted; now pulses with gold border.
+- **Reduced motion:** Added `html.reduced-motion` CSS class and JS toggle in settings-store; all animations respect user preference.
+- **Haptic feedback:** Added `vibrate()` helper in audio-manager; all games trigger light vibration on key moments when `vibrationEnabled` is true.
+- **Snake speed curve:** Speed now increases from 160ms to 70ms as snake grows.
 
 ### 1. Root route not matching (commit 1b25e9f)
 - **Symptom:** Home page showed only header, no game cards
@@ -144,8 +172,8 @@ No external CDNs, fonts, analytics, or UI frameworks.
 
 ## What Works
 
-- ✅ Home screen loads, shows 8 game cards with live cache status
-- ✅ All 8 games are playable (Tiny Drift Karts, 2048, Minesweeper, Solitaire, Water Sort, Block Blast, Snake, Memory)
+- ✅ Home screen loads, shows 9 game cards with live cache status
+- ✅ All 9 games are playable (Tiny Drift Karts, 2048, Minesweeper, Solitaire, Water Sort, Block Blast, Snake, Memory, Tic-Tac-Toe)
 - ✅ Warm toy-arcade visual design: coral/peach backgrounds, cocoa top bar, thick borders, rounded shapes
 - ✅ Settings screen: quality mode toggle (persists), audio prefs, data display, nickname
 - ✅ Offline manager: real SW status, connection state, storage estimate, download/remove buttons
@@ -161,12 +189,15 @@ No external CDNs, fonts, analytics, or UI frameworks.
 
 - **Visual polish:** ✅ COMPLETED. The warm toy-arcade design system is fully integrated — coral/peach backgrounds, cocoa top bar, thick dark borders, rounded shapes, push-down buttons, system fonts. CSS consolidated from dark cyber theme + overrides into a single warm design.
 - **iOS install instructions:** No "Add to Home Screen" banner for Safari. iOS instructions modal exists but needs testing on real devices.
+- **Minesweeper difficulty:** Three levels added (Beginner/Intermediate/Expert) but expert grid (30×16) may be cramped on small screens.
+- **Car physics tuning:** Constants are set to reasonable defaults. Real playtesting will reveal whether acceleration, grip, drift, and turn rate feel good.
+- **Per-game asset manifests:** The package manager downloads by loading the game module (which the SW caches). Real per-game asset manifests with versioned packages, progress UI, and low/high quality asset selection are not built (deferred per PROJECT.txt Phase 2+).
 - **Mobile touch tuning:** Touch controls refined across several commits but haven't been tested on real devices.
 - **Car physics tuning:** Constants are set to reasonable defaults. Real playtesting will reveal whether acceleration, grip, drift, and turn rate feel good.
 - **Per-game asset manifests:** The package manager downloads by loading the game module (which the SW caches). Real per-game asset manifests with versioned packages, progress UI, and low/high quality asset selection are not built (deferred per PROJECT.txt Phase 2+).
 - **Online multiplayer / rooms:** No backend exists. This is intentional — PROJECT.txt defers this to Phase 4+.
 - **Same-device multiplayer:** Not built (Phase 3).
-- **More games:** Phase 2 complete — 8 games built (Tiny Drift Karts, 2048, Minesweeper, Solitaire, Water Sort, Block Blast, Snake, Memory).
+- **More games:** Phase 2 complete — 8 games built (Tiny Drift Karts, 2048, Minesweeper, Solitaire, Water Sort, Block Blast, Snake, Memory, Tic-Tac-Toe).
 - **E2E / performance tests:** Not built.
 - **Bundle size CI checks:** Not built.
 - **`offline-manager-ui.ts`:** Contains `createActionButton` which is exported but unused. The offline screen builds its own buttons inline. Safe to remove or refactor.
@@ -201,7 +232,7 @@ npm run preview  # Serve the production build locally
 
 1. ~~**Visual design pass** — the most impactful next step given user feedback~~ ✅ DONE
 2. **Real device testing** — car game touch controls, PWA install flow on iOS/Android
-3. ~~**Phase 2 complete:** Add Snake and Memory games~~ ✅ DONE
+3. ~~**Phase 2 complete:** Add Snake, Memory, and Tic-Tac-Toe games~~ ✅ DONE
 4. **Phase 3:** Same-device multiplayer (checkers, backgammon, pass-and-play)
 5. **Phase 4:** Online room system (backend, WebSocket, room codes)
 6. **Phase 5:** Werewolf/Vampire Village social deduction game

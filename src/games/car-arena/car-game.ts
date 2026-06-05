@@ -235,7 +235,16 @@ export class CarGame {
     let dt = (now - this.lastTime) / 1000;
     this.lastTime = now;
     if (dt > 0.2) dt = 0.016;
-    this.resize();
+    // Only resize when dimensions actually changed
+    const canvasWidth = this.canvas?.width ?? 0;
+    const canvasHeight = this.canvas?.height ?? 0;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = this.canvas?.getBoundingClientRect();
+    const desiredWidth = Math.floor((rect?.width ?? 0) * dpr);
+    const desiredHeight = Math.floor((rect?.height ?? 0) * dpr);
+    if (canvasWidth !== desiredWidth || canvasHeight !== desiredHeight) {
+      this.resize();
+    }
 
     const input = this.input.poll();
     if (input.restart && this.phase !== "menu") this.startRace();

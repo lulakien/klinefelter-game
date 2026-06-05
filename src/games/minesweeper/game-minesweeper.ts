@@ -5,7 +5,7 @@
  * Long-press or right-click to flag. First click is always safe.
  */
 
-import { playSfx } from "../../app/audio-manager.js";
+import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { saveScore } from "../../settings/scores-store.js";
 
 // ---- Types ----
@@ -32,21 +32,23 @@ interface GameState {
   startTime: number;
   elapsed: number;
   scoreSubmitted: boolean;
+  difficulty: Difficulty;
 }
 
 // ---- Constants ----
 
-const DEFAULT_ROWS = 9;
-const DEFAULT_COLS = 9;
-const DEFAULT_MINES = 10;
+export type Difficulty = "beginner" | "intermediate" | "expert";
+
+const DIFFICULTIES: Record<Difficulty, { rows: number; cols: number; mineCount: number }> = {
+  beginner: { rows: 9, cols: 9, mineCount: 10 },
+  intermediate: { rows: 16, cols: 16, mineCount: 40 },
+  expert: { rows: 16, cols: 30, mineCount: 99 },
+};
 
 // ---- Game Logic ----
 
-export function createGame(
-  rows = DEFAULT_ROWS,
-  cols = DEFAULT_COLS,
-  mineCount = DEFAULT_MINES,
-): GameState {
+export function createGame(difficulty: Difficulty = "beginner"): GameState {
+  const { rows, cols, mineCount } = DIFFICULTIES[difficulty];
   const grid: Cell[][] = [];
   for (let r = 0; r < rows; r++) {
     grid[r] = [];
@@ -75,6 +77,7 @@ export function createGame(
     startTime: 0,
     elapsed: 0,
     scoreSubmitted: false,
+    difficulty,
   };
 }
 
@@ -313,12 +316,18 @@ export class MinesweeperRenderer {
     this.onContextMenu = (e: Event) => e.preventDefault();
   }
 
+  private setDifficulty(difficulty: Difficulty): void {
+    this.state = createGame(difficulty);
+    this.render();
+  }
+
   mount(container: HTMLElement): void {
     this.container = container;
     container.addEventListener("contextmenu", this.onContextMenu);
     this.render();
 
     // Timer update
+    if (this.timerInterval) clearInterval(this.timerInterval);
     this.timerInterval = setInterval(() => this.updateTimer(), 250);
   }
 
@@ -393,7 +402,7 @@ export class MinesweeperRenderer {
   }
 
   restart(): void {
-    this.state = createGame();
+    this.state = createGame(this.state.difficulty);
     this.render();
   }
 
@@ -476,22 +485,31 @@ export class MinesweeperRenderer {
   }
 
   private bindEvents(): void {
+    if (!this.container) return;
     const { rows, cols } = this.state;
 
     // Smiley button
-    document
-      .getElementById("btn-smiley")
+    this.container.querySelector("#btn-smiley")
       ?.addEventListener("click", () => this.restart());
 
+    // Difficulty toggle
+    this.container.querySelector("#ms-diff-toggle")?.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest(".toggle-btn");
+      if (!btn) return;
+      const value = btn.getAttribute("data-value") as Difficulty;
+      if (value && value !== this.state.difficulty) {
+        this.setDifficulty(value);
+      }
+    });
+
     // Restart button
-    document
-      .getElementById("btn-ms-restart")
+    this.container.querySelector("#btn-ms-restart")
       ?.addEventListener("click", () => this.restart());
 
     // Cell events
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        const el = document.getElementById(`cell-${r}-${c}`);
+        const el = this.container.querySelector(`#cell-${r}-${c}`);
         if (!el) continue;
 
         el.addEventListener("click", (e) => {
@@ -529,8 +547,10 @@ export class MinesweeperRenderer {
   private playStateSfx(): void {
     if (this.state.won) {
       playSfx("success");
+      vibrate([25, 25, 25]);
     } else if (this.state.gameOver) {
       playSfx("fail");
+      vibrate(60);
     } else {
       playSfx("hit");
     }

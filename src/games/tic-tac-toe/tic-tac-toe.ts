@@ -4,7 +4,7 @@
  * CSS grid board, warm toy-arcade design, minimax AI.
  */
 
-import { playSfx } from "../../app/audio-manager.js";
+import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 
 type Cell = "X" | "O" | "";
@@ -16,6 +16,7 @@ interface TicTacToeState {
   winner: Cell;
   draw: boolean;
   gameOver: boolean;
+  winningLine: number[];
   mode: "pvp" | "ai";
   difficulty: Difficulty;
   scores: { x: number; o: number; draws: number };
@@ -32,6 +33,7 @@ function createState(): TicTacToeState {
     winner: "",
     draw: false,
     gameOver: false,
+    winningLine: [],
     mode: "pvp",
     difficulty: "medium",
     scores: { x: 0, o: 0, draws: 0 },
@@ -41,18 +43,19 @@ function createState(): TicTacToeState {
   };
 }
 
-function checkWinner(board: Cell[]): Cell {
+function checkWinner(board: Cell[]): { winner: Cell; line: number[] } {
   const lines = [
     [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
     [0, 3, 6], [1, 4, 7], [2, 5, 8], // cols
     [0, 4, 8], [2, 4, 6], // diagonals
   ];
-  for (const [a, b, c] of lines) {
+  for (const line of lines) {
+    const [a, b, c] = line;
     if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-      return board[a];
+      return { winner: board[a], line };
     }
   }
-  return "";
+  return { winner: "", line: [] };
 }
 
 function isDraw(board: Cell[]): boolean {
@@ -64,9 +67,9 @@ function availableMoves(board: Cell[]): number[] {
 }
 
 function minimax(board: Cell[], depth: number, isMaximizing: boolean): number {
-  const winner = checkWinner(board);
-  if (winner === "O") return 10 - depth;
-  if (winner === "X") return depth - 10;
+  const result = checkWinner(board);
+  if (result.winner === "O") return 10 - depth;
+  if (result.winner === "X") return depth - 10;
   if (isDraw(board)) return 0;
 
   const moves = availableMoves(board);
@@ -157,11 +160,12 @@ export class TicTacToeRenderer {
     state.board[index] = state.currentPlayer;
     playSfx("hit");
 
-    const winner = checkWinner(state.board);
-    if (winner) {
-      state.winner = winner;
+    const result = checkWinner(state.board);
+    if (result.winner) {
+      state.winner = result.winner;
+      state.winningLine = result.line;
       state.gameOver = true;
-      if (winner === "X") {
+      if (state.winner === "X") {
         state.scores.x++;
         state.currentStreak++;
         state.bestStreak = Math.max(state.bestStreak, state.currentStreak);
@@ -170,6 +174,7 @@ export class TicTacToeRenderer {
         state.currentStreak = 0;
       }
       playSfx("success");
+      vibrate([30, 50, 30]);
       this.saveScore();
     } else if (isDraw(state.board)) {
       state.draw = true;
@@ -177,6 +182,7 @@ export class TicTacToeRenderer {
       state.scores.draws++;
       state.currentStreak = 0;
       playSfx("fail");
+      vibrate(40);
       this.saveScore();
     } else {
       state.currentPlayer = state.currentPlayer === "X" ? "O" : "X";
@@ -199,6 +205,7 @@ export class TicTacToeRenderer {
     this.state.winner = "";
     this.state.draw = false;
     this.state.gameOver = false;
+    this.state.winningLine = [];
     this.state.scoreSubmitted = false;
     this.render();
   }
@@ -255,12 +262,13 @@ export class TicTacToeRenderer {
         <div class="tic-tac-toe__status">${statusText}</div>
 
         <div class="tic-tac-toe__board">
-          ${board.map((cell, i) => `
-            <button class="tic-tac-toe__cell ${cell ? `tic-tac-toe__cell--${cell.toLowerCase()}` : ""} ${gameOver ? "tic-tac-toe__cell--disabled" : ""}"
+          ${board.map((cell, i) => {
+            const won = this.state.winningLine.includes(i);
+            return `<button class="tic-tac-toe__cell ${cell ? `tic-tac-toe__cell--${cell.toLowerCase()}` : ""} ${gameOver ? "tic-tac-toe__cell--disabled" : ""} ${won ? "tic-tac-toe__cell--win" : ""}"
                     data-index="${i}" ${cell || gameOver ? "disabled" : ""}>
               ${cell}
-            </button>
-          `).join("")}
+            </button>`;
+          }).join("")}
         </div>
 
         <div class="tic-tac-toe__streak">

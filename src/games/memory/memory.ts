@@ -5,7 +5,7 @@
  * warm toy-arcade design, touch + click support.
  */
 
-import { playSfx } from "../../app/audio-manager.js";
+import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 
 // ---- Constants ----
@@ -221,6 +221,7 @@ export class MemoryRenderer {
       first.matched = true;
       second.matched = true;
       playSfx("success");
+      vibrate(20);
       state.firstPick = null;
       state.secondPick = null;
       state.locked = false;

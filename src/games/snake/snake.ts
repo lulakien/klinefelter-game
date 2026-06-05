@@ -5,7 +5,7 @@
  * warm toy-arcade color palette, score tracking.
  */
 
-import { playSfx } from "../../app/audio-manager.js";
+import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 
 // ---- Constants ----
@@ -13,7 +13,9 @@ import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 const GRID = 20;
 const CELL = 24; // px per cell
 const GAP = 2;
-const TICK_MS = 130; // ms between moves (speed)
+const BASE_TICK_MS = 160; // starting speed
+const MIN_TICK_MS = 70;   // fastest speed
+const SPEED_INCREMENT = 3; // ms faster per food eaten
 const CANVAS_PADDING = 16;
 
 // DESIGN.md warm palette
@@ -129,6 +131,7 @@ function stepSnake(state: SnakeState): void {
       state.bestScore = state.score;
     }
     playSfx("click");
+    vibrate(15);
   }
 }
 
@@ -215,7 +218,9 @@ export class SnakeRenderer {
     // Actions
     const actions = document.createElement("div");
     actions.className = "puzzle-actions";
-    actions.innerHTML = '<a class="btn btn--secondary" href="#/">Back to Home</a>';
+    actions.id = "snake-actions";
+    actions.innerHTML = '<button class="btn btn--secondary" id="snake-restart">Restart</button><a class="btn btn--secondary" href="#/">Back to Home</a>';
+    actions.querySelector("#snake-restart")?.addEventListener("click", () => this.reset());
 
     wrapper.appendChild(header);
     wrapper.appendChild(boardWrap);
@@ -251,8 +256,9 @@ export class SnakeRenderer {
     this.state.lastTimestamp = now;
 
     this.state.tickTimer += dt;
-    while (this.state.tickTimer >= TICK_MS) {
-      this.state.tickTimer -= TICK_MS;
+    const tickMs = Math.max(MIN_TICK_MS, BASE_TICK_MS - (this.state.snake.length - 3) * SPEED_INCREMENT);
+    while (this.state.tickTimer >= tickMs) {
+      this.state.tickTimer -= tickMs;
       stepSnake(this.state);
     }
 
@@ -369,7 +375,7 @@ export class SnakeRenderer {
 
       ctx.font = "700 13px system-ui, sans-serif";
       ctx.fillStyle = "rgba(255,255,255,0.7)";
-      ctx.fillText("Tap or press R to restart", pad + (GRID * CELL) / 2, pad + (GRID * CELL) / 2 + 48);
+      ctx.fillText("Tap board or press R to restart", pad + (GRID * CELL) / 2, pad + (GRID * CELL) / 2 + 48);
     }
   }
 
@@ -430,11 +436,24 @@ export class SnakeRenderer {
       this.touchStart = { x: touch.clientX, y: touch.clientY };
     }
 
-    if ((e.type === "touchmove" || e.type === "touchend") && this.touchStart) {
+    if (e.type === "touchend" && this.touchStart) {
       const dx = touch.clientX - this.touchStart.x;
       const dy = touch.clientY - this.touchStart.y;
       const threshold = 20;
 
+      if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+          changeDirection(this.state, dx > 0 ? "right" : "left");
+        } else {
+          changeDirection(this.state, dy > 0 ? "down" : "up");
+        }
+      }
+      this.touchStart = null;
+    } else if (e.type === "touchmove" && this.touchStart) {
+      // Continuous direction changes during drag
+      const dx = touch.clientX - this.touchStart.x;
+      const dy = touch.clientY - this.touchStart.y;
+      const threshold = 28;
       if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
         if (Math.abs(dx) > Math.abs(dy)) {
           changeDirection(this.state, dx > 0 ? "right" : "left");

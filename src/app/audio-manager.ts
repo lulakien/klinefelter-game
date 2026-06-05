@@ -90,3 +90,13 @@ export function playSfx(type: SfxType): void {
     // Suppress Web Audio autoplay/blocking errors
   }
 }
+
+
+/** Trigger haptic feedback if enabled and supported. */
+export function vibrate(pattern: number | number[]): void {
+  const settings = getSettings();
+  if (!settings.vibrationEnabled) return;
+  if ("vibrate" in navigator) {
+    navigator.vibrate(pattern);
+  }
+}

@@ -959,6 +959,7 @@ body::before {
 /* ---- 2048 ---- */
 
 .game-2048 {
+  position: relative;
   max-width: 420px;
   margin: 0 auto;
   padding: var(--space-md);
@@ -1071,6 +1072,7 @@ body::before {
   border-radius: var(--radius-md);
   z-index: 10;
   animation: fade-in 0.3s forwards;
+  pointer-events: none;
 }
 
 .game-2048__overlay--win {
@@ -1080,6 +1082,7 @@ body::before {
 
 .game-2048__overlay-content {
   text-align: center;
+  pointer-events: auto;
 }
 
 .game-2048__overlay-content h2 {
@@ -1111,6 +1114,24 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+
+
+.minesweeper__difficulty {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-sm);
+}
+
+.minesweeper__difficulty .toggle-group {
+  gap: 4px;
+}
+
+.minesweeper__difficulty .toggle-btn {
+  padding: 4px 10px;
+  font-size: var(--font-size-xs);
+  height: auto;
+  min-width: auto;
 }
 
 .minesweeper__header {
@@ -1905,6 +1926,17 @@ body::before {
   opacity: 0.85;
 }
 
+.tic-tac-toe__cell--win {
+  animation: pulse-win 0.6s ease-in-out infinite alternate;
+  border-color: var(--color-warning) !important;
+  box-shadow: 0 0 0 4px rgba(255, 213, 41, 0.35);
+}
+
+@keyframes pulse-win {
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
+}
+
 .tic-tac-toe__streak {
   display: flex;
   gap: var(--space-lg);
@@ -1924,5 +1956,25 @@ body::before {
     height: 82px;
     font-size: 2rem;
   }
+}
+
+
+/* ---- Reduced Motion ---- */
+
+html.reduced-motion *,
+html.reduced-motion *::before,
+html.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+
+.snake__actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: center;
+  margin-top: var(--space-sm);
 }
 

@@ -1,4 +1,4 @@
-import { playSfx } from "../../app/audio-manager.js";
+import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 
 type Suit = "H" | "D" | "C" | "S";
@@ -228,6 +228,7 @@ export class SolitaireRenderer {
     if (pile === -1) return;
     this.state.selected = selection;
     if (this.tryMove({ zone: "foundation", pile, index: this.state.foundations[pile].length })) {
+      if (this.state.won) vibrate([20, 20, 20, 20]);
       playSfx(this.state.won ? "success" : "hit");
       this.render();
     }
@@ -346,6 +347,7 @@ export class SolitaireRenderer {
     const pile = Number(el.dataset.pile);
     const selection = { zone, pile, index: 0 };
     if (this.state.selected && this.tryMove(selection)) {
+      if (this.state.won) vibrate([20, 20, 20, 20]);
       playSfx(this.state.won ? "success" : "hit");
       this.render();
     }

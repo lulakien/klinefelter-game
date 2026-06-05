@@ -5,7 +5,7 @@
  * Supports keyboard (arrow keys) and touch (swipe).
  */
 
-import { playSfx } from "../../app/audio-manager.js";
+import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 
 // ---- Types ----
@@ -154,6 +154,7 @@ export function move(state: GameState, direction: Direction): boolean {
       tile.merged = true;
       state.score += tile.value;
       scoreGained += tile.value;
+      vibrate(10);
 
       // Remove merged tile
       state.tiles = state.tiles.filter((t) => t.id !== nextCell.id);
@@ -446,13 +447,11 @@ export class Game2048Renderer {
     }
 
     // Bind restart button
-    document
-      .getElementById("btn-2048-restart")
+    this.container.querySelector("#btn-2048-restart")
       ?.addEventListener("click", () => this.restart());
 
     // Bind keep playing button
-    document
-      .getElementById("btn-2048-keep-playing")
+    this.container.querySelector("#btn-2048-keep-playing")
       ?.addEventListener("click", () => {
         this.state.keepPlaying = true;
         this.render();

@@ -1,4 +1,4 @@
-import { playSfx } from "../../app/audio-manager.js";
+import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 
 type ColorId = 0 | 1 | 2 | 3 | 4 | 5;
@@ -10,6 +10,7 @@ interface WaterSortState {
   moves: number;
   bestMoves: number;
   won: boolean;
+  gameOver: boolean;
   scoreSubmitted: boolean;
 }
 
@@ -35,6 +36,7 @@ export function createWaterSortGame(): WaterSortState {
     moves: 0,
     bestMoves: getPersonalBest("water-sort")?.score ?? 0,
     won: false,
+    gameOver: false,
     scoreSubmitted: false,
   };
 }
@@ -129,10 +131,14 @@ export class WaterSortRenderer {
     if (moved) {
       this.state.moves++;
       this.state.won = isWon(this.state.tubes);
+      if (!this.state.won) {
+        this.state.gameOver = !hasAnyMove(this.state.tubes);
+      }
       if (this.state.won && (!this.state.bestMoves || this.state.moves < this.state.bestMoves)) {
         this.state.bestMoves = this.state.moves;
       }
       playSfx(this.state.won ? "success" : "hit");
+      if (this.state.won) vibrate([20, 30, 20]);
     } else {
       playSfx("fail");
     }
@@ -168,6 +174,7 @@ export class WaterSortRenderer {
           <a class="btn btn--secondary" href="#/">Back to Home</a>
         </div>
         ${this.state.won ? `<div class="puzzle-toast">Sorted in ${this.state.moves} moves.</div>` : ""}
+        ${this.state.gameOver ? `<div class="puzzle-toast puzzle-toast--lose">No more moves.</div>` : ""}
       </div>
     `;
 

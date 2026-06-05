@@ -50,6 +50,7 @@ function save(): void {
 
 function notify(): void {
   const snapshot = getSettings();
+  document.documentElement.classList.toggle("reduced-motion", snapshot.reducedMotion);
   for (const fn of listeners) {
     fn(snapshot);
   }
@@ -57,6 +58,7 @@ function notify(): void {
 
 // Initialize
 settings = load();
+document.documentElement.classList.toggle("reduced-motion", settings.reducedMotion);
 
 /** Get a frozen snapshot of current settings. */
 export function getSettings(): AppSettings {

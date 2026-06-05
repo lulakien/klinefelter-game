@@ -1,4 +1,4 @@
-import { playSfx } from "../../app/audio-manager.js";
+import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 
 interface Shape {
@@ -42,7 +42,7 @@ let nextShapeId = 0;
 
 export function createBlockBlastGame(): BlockBlastState {
   nextShapeId = 0;
-  return {
+  const state: BlockBlastState = {
     grid: Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => null)),
     shapes: drawShapes(),
     selectedShape: null,
@@ -51,6 +51,8 @@ export function createBlockBlastGame(): BlockBlastState {
     gameOver: false,
     scoreSubmitted: false,
   };
+  state.gameOver = !hasMove(state);
+  return state;
 }
 
 function drawShapes(): Shape[] {
@@ -88,7 +90,9 @@ function placeShape(state: BlockBlastState, shapeIndex: number, row: number, col
   }
   shape.used = true;
   state.score += shape.cells.length * 10;
-  state.score += clearLines(state) * 100;
+  const lines = clearLines(state);
+  if (lines > 0) vibrate(lines * 15);
+  state.score += lines * 100;
 
   if (state.shapes.every((item) => item.used)) {
     state.shapes = drawShapes();
