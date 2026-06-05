@@ -32,6 +32,8 @@ interface SolitaireState {
   bestMoves: number;
   won: boolean;
   scoreSubmitted: boolean;
+  startedAt: number;
+  elapsedSeconds: number;
 }
 
 const SUITS: Suit[] = ["H", "D", "C", "S"];
@@ -68,6 +70,8 @@ export function createSolitaireGame(): SolitaireState {
     bestMoves: getPersonalBest("solitaire")?.score ?? 0,
     won: false,
     scoreSubmitted: false,
+    startedAt: Date.now(),
+    elapsedSeconds: 0,
   };
 }
 
@@ -124,11 +128,23 @@ function revealTableauTop(state: SolitaireState, pile: number): boolean {
   return false;
 }
 
+function getElapsedSeconds(state: SolitaireState): number {
+  if (state.won) return state.elapsedSeconds;
+  return Math.floor((Date.now() - state.startedAt) / 1000);
+}
+
+function markWinIfComplete(state: SolitaireState): void {
+  state.won = state.foundations.every((pile) => pile.length === 13);
+  if (state.won) {
+    state.elapsedSeconds = getElapsedSeconds(state);
+    if (!state.bestMoves || state.moves < state.bestMoves) state.bestMoves = state.moves;
+  }
+}
+
 function afterMove(state: SolitaireState, source?: Selection): void {
   if (source?.zone === "tableau") revealTableauTop(state, source.pile);
   state.moves++;
-  state.won = state.foundations.every((pile) => pile.length === 13);
-  if (state.won && (!state.bestMoves || state.moves < state.bestMoves)) state.bestMoves = state.moves;
+  markWinIfComplete(state);
 }
 
 function submitScore(state: SolitaireState): void {
@@ -151,6 +167,8 @@ export class SolitaireRenderer {
   private boundOnMove: (e: PointerEvent) => void;
   private boundOnUp: (e: PointerEvent) => void;
   private animatingWasteCardId: string | null = null;
+  private timerInterval: ReturnType<typeof setInterval> | null = null;
+  private lastTap: { key: string; at: number } | null = null;
 
   constructor(state: SolitaireState) {
     this.state = state;
@@ -161,10 +179,16 @@ export class SolitaireRenderer {
   mount(container: HTMLElement): void {
     this.container = container;
     this.render();
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    this.timerInterval = setInterval(() => this.updateTimer(), 500);
   }
 
   destroy(): void {
     this.endDrag();
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
     this.container = null;
   }
 
@@ -205,11 +229,24 @@ export class SolitaireRenderer {
 
     if (this.tryMove(selection)) {
       playSfx(this.state.won ? "success" : "hit");
+      this.maybeAutoComplete();
     } else {
       this.state.selected = selection;
       playSfx("fail");
     }
     this.render();
+  }
+
+  private tapCard(selection: Selection): void {
+    const key = `${selection.zone}:${selection.pile}:${selection.index}`;
+    const now = Date.now();
+    if (this.lastTap?.key === key && now - this.lastTap.at < 360) {
+      this.lastTap = null;
+      this.autoFoundation(selection);
+      return;
+    }
+    this.lastTap = { key, at: now };
+    this.select(selection);
   }
 
   private tryMove(target: Selection): boolean {
@@ -244,17 +281,52 @@ export class SolitaireRenderer {
   }
 
   private autoFoundation(selection: Selection): void {
-    const sourceCards = getSelectionCards(this.state, selection);
-    if (sourceCards.length !== 1) return;
-    const card = sourceCards[0];
-    const pile = this.state.foundations.findIndex((foundation) => canMoveToFoundation(card, foundation));
-    if (pile === -1) return;
-    this.state.selected = selection;
-    if (this.tryMove({ zone: "foundation", pile, index: this.state.foundations[pile].length })) {
+    const moved = this.moveSingleCardToFoundation(selection);
+    if (moved) {
       if (this.state.won) vibrate([20, 20, 20, 20]);
       playSfx(this.state.won ? "success" : "hit");
+      this.maybeAutoComplete();
       this.render();
     }
+  }
+
+  private moveSingleCardToFoundation(selection: Selection): boolean {
+    const sourceCards = getSelectionCards(this.state, selection);
+    if (sourceCards.length !== 1) return false;
+    const card = sourceCards[0];
+    const pile = this.state.foundations.findIndex((foundation) => canMoveToFoundation(card, foundation));
+    if (pile === -1) return false;
+    this.state.selected = selection;
+    return this.tryMove({ zone: "foundation", pile, index: this.state.foundations[pile].length });
+  }
+
+  private allTableauRevealed(): boolean {
+    return this.state.tableau.every((pile) => pile.every((card) => card.faceUp));
+  }
+
+  private maybeAutoComplete(): void {
+    if (this.state.won || !this.allTableauRevealed()) return;
+
+    let moved = false;
+    let safety = 0;
+    do {
+      moved = false;
+      const wasteIndex = this.state.waste.length - 1;
+      if (wasteIndex >= 0 && this.moveSingleCardToFoundation({ zone: "waste", pile: 0, index: wasteIndex })) {
+        moved = true;
+      }
+
+      for (let pile = 0; pile < this.state.tableau.length; pile++) {
+        const index = this.state.tableau[pile].length - 1;
+        if (index >= 0 && this.moveSingleCardToFoundation({ zone: "tableau", pile, index })) {
+          moved = true;
+        }
+      }
+      safety++;
+    } while (moved && !this.state.won && safety < 80);
+
+    this.state.selected = null;
+    if (this.state.won) vibrate([20, 20, 20, 20]);
   }
 
   // ---- Drag support ----
@@ -349,6 +421,7 @@ export class SolitaireRenderer {
       this.state.selected = null;
     } else {
       playSfx(this.state.won ? "success" : "hit");
+      this.maybeAutoComplete();
     }
 
     this.endDrag();
@@ -372,6 +445,7 @@ export class SolitaireRenderer {
 
     const wrapper = document.createElement("div");
     wrapper.className = "solitaire";
+    const elapsed = getElapsedSeconds(this.state);
 
     // Header
     const header = document.createElement("div");
@@ -383,6 +457,7 @@ export class SolitaireRenderer {
       </div>
       <div class="puzzle-stats">
         <span>Moves <strong>${this.state.moves}</strong></span>
+        <span>Time <strong id="solitaire-time">${elapsed}s</strong></span>
         <span>Best <strong>${this.state.bestMoves ? this.state.bestMoves : "-"}</strong></span>
       </div>
     `;
@@ -411,7 +486,7 @@ export class SolitaireRenderer {
           if (this.animatingWasteCardId === wasteCard.id) this.animatingWasteCardId = null;
         }, { once: true });
       }
-      wEl.addEventListener("click", () => this.select({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
+      wEl.addEventListener("click", () => this.tapCard({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
       wEl.addEventListener("dblclick", () => this.autoFoundation({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
       wEl.addEventListener("pointerdown", (e) => this.startDrag(e, { zone: "waste", pile: 0, index: this.state.waste.length - 1 }, wEl));
       wastePile.appendChild(wEl);
@@ -472,7 +547,7 @@ export class SolitaireRenderer {
 
           cEl.addEventListener("click", (e) => {
             e.stopPropagation();
-            this.select({ zone: "tableau", pile: pileIndex, index: cardIndex });
+            this.tapCard({ zone: "tableau", pile: pileIndex, index: cardIndex });
           });
           cEl.addEventListener("dblclick", (e) => {
             e.stopPropagation();
@@ -528,5 +603,11 @@ export class SolitaireRenderer {
     const current = this.state.selected;
     if (!current) return false;
     return current.zone === selection.zone && current.pile === selection.pile && current.index === selection.index;
+  }
+
+  private updateTimer(): void {
+    if (this.state.won) return;
+    const el = this.container?.querySelector("#solitaire-time");
+    if (el) el.textContent = `${getElapsedSeconds(this.state)}s`;
   }
 }

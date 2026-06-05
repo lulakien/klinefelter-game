@@ -22,19 +22,21 @@ interface WaterSortState {
   difficulty: WaterSortDifficulty;
 }
 
-export type WaterSortDifficulty = "easy" | "medium" | "hard";
+export type WaterSortDifficulty = "easy" | "medium" | "hard" | "expert";
 
 const CAPACITY = 4;
 
 const COLORS = [
   "#ff5b5b", "#23c7f4", "#ffd529", "#82de47",
   "#9b5cff", "#ff9f43", "#ff6b9d", "#2ed1a2",
+  "#3f8cff", "#c56cf0",
 ];
 
 const DIFFICULTIES: Record<WaterSortDifficulty, { colors: number; empty: number; steps: number }> = {
-  easy: { colors: 4, empty: 2, steps: 18 },
-  medium: { colors: 6, empty: 2, steps: 28 },
-  hard: { colors: 8, empty: 2, steps: 38 },
+  easy: { colors: 5, empty: 2, steps: 28 },
+  medium: { colors: 7, empty: 2, steps: 44 },
+  hard: { colors: 8, empty: 2, steps: 58 },
+  expert: { colors: 10, empty: 2, steps: 76 },
 };
 
 const GENERATION_ATTEMPTS = 24;
@@ -305,6 +307,7 @@ export class WaterSortRenderer {
         <button class="toggle-btn ${this.state.difficulty === "easy" ? "toggle-btn--active" : ""}" data-value="easy">Easy</button>
         <button class="toggle-btn ${this.state.difficulty === "medium" ? "toggle-btn--active" : ""}" data-value="medium">Medium</button>
         <button class="toggle-btn ${this.state.difficulty === "hard" ? "toggle-btn--active" : ""}" data-value="hard">Hard</button>
+        <button class="toggle-btn ${this.state.difficulty === "expert" ? "toggle-btn--active" : ""}" data-value="expert">Expert</button>
       </div>
     `;
     wrapper.appendChild(controls);
@@ -312,7 +315,7 @@ export class WaterSortRenderer {
     // Rack
     const rack = document.createElement("div");
     rack.className = "water-sort__rack";
-    const cols = this.state.tubes.length <= 6 ? 3 : 4;
+    const cols = this.state.tubes.length <= 6 ? 3 : this.state.tubes.length <= 10 ? 4 : 4;
     rack.style.gridTemplateColumns = `repeat(${cols}, minmax(60px, 1fr))`;
 
     this.state.tubes.forEach((tube, index) => {

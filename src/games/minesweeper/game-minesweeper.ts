@@ -437,9 +437,11 @@ export class MinesweeperRenderer {
           <div class="minesweeper__timer">⏱ ${Math.floor(elapsed)}</div>
         </div>
 
-        <div class="minesweeper__board" id="ms-board"
-             style="display:grid;grid-template-columns:repeat(${cols},var(--ms-cell-size));grid-auto-rows:var(--ms-cell-size);gap:2px;">
-          ${this.renderBoardHTML()}
+        <div class="minesweeper__board-scroll" aria-label="Scrollable Minesweeper board">
+          <div class="minesweeper__board" id="ms-board"
+               style="display:grid;grid-template-columns:repeat(${cols},var(--ms-cell-size));grid-auto-rows:var(--ms-cell-size);gap:2px;">
+            ${this.renderBoardHTML()}
+          </div>
         </div>
 
         <div class="minesweeper__controls">
@@ -537,8 +539,7 @@ export class MinesweeperRenderer {
           this.handleCellRightClick(r, c);
         });
 
-        el.addEventListener("touchstart", (e) => {
-          e.preventDefault();
+        el.addEventListener("touchstart", () => {
           this.handleTouchStart(r, c);
         });
 

@@ -1194,28 +1194,32 @@ body::before {
   box-shadow: 0 1px 0 rgba(75, 48, 53, 0.14);
 }
 
-.minesweeper__board {
-  width: max-content;
+.minesweeper__board-scroll {
   max-width: 100%;
-  align-self: center;
-  background: #ffe2d0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
   border: 5px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 6px;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: pan-x;
+  background: #ffe2d0;
   box-shadow: var(--shadow-premium);
-  overflow: visible;
+  padding: 6px;
 }
 
-.minesweeper--intermediate .minesweeper__board,
-.minesweeper--expert .minesweeper__board {
+.minesweeper--intermediate .minesweeper__board-scroll,
+.minesweeper--expert .minesweeper__board-scroll {
   align-self: stretch;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-gutter: stable;
+  max-height: min(68dvh, 620px);
+}
+
+.minesweeper__board {
+  width: max-content;
+  align-self: center;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
 }
 
 .ms-cell {
@@ -1368,7 +1372,8 @@ body::before {
 
 .water-sort,
 .block-blast,
-.solitaire {
+.solitaire,
+.puzzle-15 {
   width: min(100%, 760px);
   margin: 0 auto;
   padding: var(--space-md);
@@ -1389,19 +1394,48 @@ body::before {
 }
 
 .water-sort__tube {
-  height: 170px;
-  border: 4px solid var(--color-border);
+  height: 178px;
+  border: 4px solid rgba(75, 48, 53, 0.82);
   border-top: 0;
-  border-radius: 0 0 24px 24px;
-  background: rgba(255, 255, 255, 0.42);
-  box-shadow: inset 0 -8px 0 rgba(75, 48, 53, 0.08), 0 5px 0 rgba(75, 48, 53, 0.18);
+  border-radius: 12px 12px 28px 28px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.58), rgba(255,255,255,0.22) 38%, rgba(255,255,255,0.08) 64%, rgba(75,48,53,0.08)),
+    rgba(255, 255, 255, 0.38);
+  box-shadow: inset 8px 0 0 rgba(255, 255, 255, 0.2), inset -6px 0 0 rgba(75, 48, 53, 0.08), inset 0 -10px 0 rgba(75, 48, 53, 0.08), 0 5px 0 rgba(75, 48, 53, 0.18);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   overflow: hidden;
-  padding: 8px;
+  padding: 10px 8px 8px;
+  position: relative;
   transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.water-sort__tube::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 10px;
+  border: 4px solid var(--color-border);
+  border-top: 0;
+  border-radius: 0 0 16px 16px;
+  background: rgba(255, 255, 255, 0.42);
+  pointer-events: none;
+}
+
+.water-sort__tube::after {
+  content: "";
+  position: absolute;
+  top: 18px;
+  bottom: 14px;
+  left: 10px;
+  width: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.34);
+  pointer-events: none;
 }
 
 .water-sort__tube--selected {
@@ -1433,6 +1467,7 @@ body::before {
   height: 34px;
   border: 2px solid rgba(75, 48, 53, 0.32);
   margin-top: 3px;
+  box-shadow: inset 0 6px 0 rgba(255, 255, 255, 0.16), inset 0 -5px 0 rgba(75, 48, 53, 0.1);
 }
 
 .water-sort__liquid:first-child {
@@ -1512,7 +1547,7 @@ body::before {
 }
 
 .block-blast__tray-slot {
-  min-height: 94px;
+  min-height: 112px;
   border: 3px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
@@ -1520,6 +1555,9 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: var(--space-sm);
+  cursor: grab;
+  touch-action: none;
 }
 
 .block-blast__tray-slot--used {
@@ -1553,9 +1591,9 @@ body::before {
 }
 
 .block-blast__mini {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
   border: 1px solid rgba(75, 48, 53, 0.28);
 }
 
@@ -1667,6 +1705,8 @@ body::before {
   opacity: 0;
   transform: scale(0.5);
   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  font-size: clamp(2.05rem, 8.8vw, 3rem);
+  line-height: 1;
 }
 
 .memory__card--flipped {
@@ -1732,9 +1772,9 @@ body::before {
 .solitaire {
   max-width: 920px;
   margin: 0 auto;
-  --card-width: 72px;
-  --card-height: 96px;
-  --card-overlap: -68px;
+  --card-width: 74px;
+  --card-height: 100px;
+  --card-overlap: -70px;
 }
 
 .solitaire__top,
@@ -1919,7 +1959,7 @@ body::before {
   }
 
   .solitaire {
-    --card-width: clamp(50px, calc((100vw - 42px) / 7), 58px);
+    --card-width: clamp(51px, calc((100vw - 46px) / 7), 60px);
     --card-height: calc(var(--card-width) * 1.42);
     --card-overlap: calc(var(--card-height) * -0.68);
     padding: var(--space-sm);
@@ -1927,17 +1967,17 @@ body::before {
   }
 
   .solitaire__top {
-    grid-template-columns: repeat(6, var(--card-width));
+    grid-template-columns: repeat(7, var(--card-width));
     justify-content: center;
-    gap: 5px;
+    gap: 4px;
   }
 
   .solitaire__waste {
-    grid-column: 2;
+    grid-column: 3;
   }
 
   .solitaire__foundation:nth-of-type(3) {
-    grid-column: 3;
+    grid-column: 4;
   }
 
   .solitaire__gap {
@@ -2172,6 +2212,85 @@ body::before {
   }
 }
 
+
+/* ---- 15 Puzzle ---- */
+
+.puzzle-15 {
+  max-width: 560px;
+}
+
+.puzzle-15__board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  aspect-ratio: 1;
+  width: min(100%, calc(100vw - var(--space-md) * 2));
+  max-width: 520px;
+  margin: 0 auto;
+  background: #ffe2d0;
+  border: 5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-premium);
+  padding: 8px;
+  touch-action: manipulation;
+}
+
+.puzzle-15__tile,
+.puzzle-15__empty {
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+}
+
+.puzzle-15__tile {
+  position: relative;
+  overflow: hidden;
+  border: 3px solid var(--color-border);
+  background-image: var(--p15-art);
+  background-size: 400% 400%;
+  background-position: calc(var(--tile-col) * -100%) calc(var(--tile-row) * -100%);
+  box-shadow: 0 5px 0 rgba(75, 48, 53, 0.22);
+  cursor: pointer;
+  color: #fff;
+  font-weight: 900;
+  font-size: clamp(1.05rem, 5vw, 1.8rem);
+  text-shadow: 0 2px 0 rgba(75, 48, 53, 0.6), 0 0 8px rgba(75, 48, 53, 0.4);
+}
+
+.puzzle-15__tile span {
+  position: absolute;
+  inset: auto 6px 5px auto;
+  min-width: 1.65em;
+  min-height: 1.65em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(75, 48, 53, 0.75);
+  border-radius: 999px;
+  background: rgba(75, 48, 53, 0.72);
+}
+
+.puzzle-15__tile:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 rgba(75, 48, 53, 0.22);
+}
+
+.puzzle-15__empty {
+  background: rgba(105, 64, 70, 0.22);
+  border: 3px dashed rgba(75, 48, 53, 0.45);
+  box-shadow: inset 0 4px 0 rgba(75, 48, 53, 0.08);
+}
+
+@media (max-width: 480px) {
+  .puzzle-15__board {
+    gap: 4px;
+    border-width: 4px;
+    padding: 6px;
+  }
+
+  .puzzle-15__tile {
+    border-width: 2px;
+  }
+}
 
 /* ---- Reduced Motion ---- */
 
@@ -2487,10 +2606,19 @@ html.reduced-motion *::after {
 .water-sort__rack,
 .solitaire,
 .solitaire__tableau,
-.solitaire__top {
+.solitaire__top,
+.puzzle-15__board {
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+}
+
+.minesweeper__board {
+  touch-action: manipulation;
+}
+
+.puzzle-15__board {
+  touch-action: manipulation;
 }
 
 /* Allow text selection on content screens */

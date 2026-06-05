@@ -211,8 +211,8 @@ export class BlockBlastRenderer {
       </div>
     `;
 
-    this.container.querySelectorAll<HTMLElement>("[data-shape]").forEach((shapeEl) => {
-      shapeEl.addEventListener("pointerdown", (e) => this.onShapePointerDown(e, Number(shapeEl.dataset.shape)));
+    this.container.querySelectorAll<HTMLElement>(".block-blast__tray-slot[data-shape]").forEach((slotEl) => {
+      slotEl.addEventListener("pointerdown", (e) => this.onShapePointerDown(e, Number(slotEl.dataset.shape)));
     });
     this.container.querySelector("#block-restart")?.addEventListener("click", () => this.restart());
   }
@@ -232,16 +232,15 @@ export class BlockBlastRenderer {
   private renderTraySlot(shape: Shape, index: number): string {
     const used = shape.used ? " block-blast__tray-slot--used" : "";
     return `
-      <div class="block-blast__tray-slot${used}">
-        ${shape.used ? "" : this.renderShape(shape, index)}
+      <div class="block-blast__tray-slot${used}"${shape.used ? "" : ` data-shape="${index}"`}>
+        ${shape.used ? "" : this.renderShape(shape)}
       </div>
     `;
   }
 
-  private renderShape(shape: Shape, index: number | null = null): string {
+  private renderShape(shape: Shape): string {
     const maxRow = Math.max(...shape.cells.map(([r]) => r));
     const maxCol = Math.max(...shape.cells.map(([, c]) => c));
-    const attrs = index === null ? "" : ` data-shape="${index}"`;
     const cells = new Set(shape.cells.map(([r, c]) => `${r},${c}`));
     let grid = "";
     for (let r = 0; r <= maxRow; r++) {
@@ -252,7 +251,7 @@ export class BlockBlastRenderer {
       }
     }
     return `
-      <div class="block-blast__shape"${attrs} style="grid-template-columns:repeat(${maxCol + 1},18px)">
+      <div class="block-blast__shape" style="grid-template-columns:repeat(${maxCol + 1},22px)">
         ${grid}
       </div>
     `;
