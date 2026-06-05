@@ -152,6 +152,8 @@ interface DragState {
   ghost: HTMLElement;
   offsetX: number;
   offsetY: number;
+  anchorOffsetRow: number;
+  anchorOffsetCol: number;
 }
 
 export class BlockBlastRenderer {
@@ -200,7 +202,7 @@ export class BlockBlastRenderer {
           </div>
         </div>
         <div class="block-blast__board" id="bb-board">${this.renderGrid()}</div>
-        <div class="block-blast__tray" id="bb-tray">${this.state.shapes.map((shape, index) => this.renderShape(shape, index)).join("")}</div>
+        <div class="block-blast__tray" id="bb-tray">${this.state.shapes.map((shape, index) => this.renderTraySlot(shape, index)).join("")}</div>
         <div class="puzzle-actions">
           <button class="btn btn--secondary" id="block-restart">New Game</button>
           <a class="btn btn--secondary" href="#/">Back to Home</a>
@@ -227,20 +229,30 @@ export class BlockBlastRenderer {
     return html;
   }
 
-  private renderShape(shape: Shape, index: number): string {
-    const used = shape.used ? " block-blast__shape--used" : "";
+  private renderTraySlot(shape: Shape, index: number): string {
+    const used = shape.used ? " block-blast__tray-slot--used" : "";
+    return `
+      <div class="block-blast__tray-slot${used}">
+        ${shape.used ? "" : this.renderShape(shape, index)}
+      </div>
+    `;
+  }
+
+  private renderShape(shape: Shape, index: number | null = null): string {
     const maxRow = Math.max(...shape.cells.map(([r]) => r));
     const maxCol = Math.max(...shape.cells.map(([, c]) => c));
+    const attrs = index === null ? "" : ` data-shape="${index}"`;
     const cells = new Set(shape.cells.map(([r, c]) => `${r},${c}`));
     let grid = "";
     for (let r = 0; r <= maxRow; r++) {
       for (let c = 0; c <= maxCol; c++) {
-        const style = cells.has(`${r},${c}`) ? ` style="background:${shape.color}"` : "";
-        grid += `<span class="block-blast__mini"${style}></span>`;
+        const filled = cells.has(`${r},${c}`);
+        const style = filled ? ` style="background:${shape.color}"` : "";
+        grid += `<span class="block-blast__mini${filled ? "" : " block-blast__mini--empty"}"${style}></span>`;
       }
     }
     return `
-      <div class="block-blast__shape${used}" data-shape="${index}" style="grid-template-columns:repeat(${maxCol + 1},18px)">
+      <div class="block-blast__shape"${attrs} style="grid-template-columns:repeat(${maxCol + 1},18px)">
         ${grid}
       </div>
     `;
@@ -256,23 +268,29 @@ export class BlockBlastRenderer {
     const rect = el.getBoundingClientRect();
     const offsetX = e.clientX - rect.left;
     const offsetY = e.clientY - rect.top;
+    const miniSize = 22;
+    const minRow = Math.min(...shape.cells.map(([r]) => r));
+    const minCol = Math.min(...shape.cells.map(([, c]) => c));
+    const maxRow = Math.max(...shape.cells.map(([r]) => r));
+    const maxCol = Math.max(...shape.cells.map(([, c]) => c));
+    const anchorOffsetCol = Math.min(maxCol, Math.max(minCol, Math.round(offsetX / miniSize - 0.5)));
+    const anchorOffsetRow = Math.min(maxRow, Math.max(minRow, Math.round(offsetY / miniSize - 0.5)));
 
-    // Create ghost
-    const ghost = el.cloneNode(true) as HTMLElement;
+    // Create a shape-only ghost so the tray card remains intact.
+    const ghost = document.createElement("div");
+    ghost.className = "block-blast__drag-ghost";
+    ghost.innerHTML = this.renderShape(shape);
     ghost.style.position = "fixed";
     ghost.style.left = `${rect.left}px`;
     ghost.style.top = `${rect.top}px`;
-    ghost.style.width = `${rect.width}px`;
-    ghost.style.height = `${rect.height}px`;
     ghost.style.pointerEvents = "none";
     ghost.style.zIndex = "9999";
-    ghost.style.opacity = "0.85";
-    ghost.style.transform = "scale(1.1)";
+    ghost.style.opacity = "0.9";
+    ghost.style.transform = "scale(1.15)";
     ghost.style.transition = "none";
-    ghost.classList.remove("block-blast__shape--used");
     document.body.appendChild(ghost);
 
-    this.drag = { shapeIndex, ghost, offsetX, offsetY };
+    this.drag = { shapeIndex, ghost, offsetX, offsetY, anchorOffsetRow, anchorOffsetCol };
     el.setPointerCapture(e.pointerId);
 
     window.addEventListener("pointermove", this.boundOnMove);
@@ -299,11 +317,8 @@ export class BlockBlastRenderer {
     let placed = false;
 
     if (board) {
-      const boardRect = board.getBoundingClientRect();
-      const cellSize = boardRect.width / SIZE;
-      const col = Math.floor((e.clientX - boardRect.left) / cellSize);
-      const row = Math.floor((e.clientY - boardRect.top) / cellSize);
-      if (placeShape(this.state, shapeIndex, row, col)) {
+      const anchor = this.getDropAnchor(board, e.clientX, e.clientY);
+      if (anchor && placeShape(this.state, shapeIndex, anchor.row, anchor.col)) {
         placed = true;
         playSfx(this.state.gameOver ? "fail" : "hit");
       }
@@ -334,22 +349,20 @@ export class BlockBlastRenderer {
     const board = this.container?.querySelector("#bb-board") as HTMLElement | null;
     if (!board) return;
 
-    const boardRect = board.getBoundingClientRect();
-    const cellSize = boardRect.width / SIZE;
-    const col = Math.floor((clientX - boardRect.left) / cellSize);
-    const row = Math.floor((clientY - boardRect.top) / cellSize);
+    const anchor = this.getDropAnchor(board, clientX, clientY);
+    if (!anchor) return;
 
     const shape = this.state.shapes[this.drag.shapeIndex];
-    const valid = canPlace(this.state, shape, row, col);
+    const valid = canPlace(this.state, shape, anchor.row, anchor.col);
 
     for (const [r, c] of shape.cells) {
-      const targetRow = row + r;
-      const targetCol = col + c;
+      const targetRow = anchor.row + r;
+      const targetCol = anchor.col + c;
       const cell = board.querySelector(`[data-row="${targetRow}"][data-col="${targetCol}"]`) as HTMLElement | null;
       if (cell) {
         cell.classList.add(valid ? "block-blast__cell--preview" : "block-blast__cell--invalid");
         if (valid) {
-          cell.style.background = shape.color;
+          cell.style.setProperty("--preview-color", shape.color);
         }
       }
     }
@@ -360,9 +373,27 @@ export class BlockBlastRenderer {
     this.container.querySelectorAll(".block-blast__cell--preview, .block-blast__cell--invalid").forEach((el) => {
       const cell = el as HTMLElement;
       cell.classList.remove("block-blast__cell--preview", "block-blast__cell--invalid");
-      if (!cell.dataset.hasColor) {
-        cell.style.background = "";
-      }
+      cell.style.removeProperty("--preview-color");
     });
+  }
+
+  private getDropAnchor(board: HTMLElement, clientX: number, clientY: number): { row: number; col: number } | null {
+    if (!this.drag) return null;
+    const boardRect = board.getBoundingClientRect();
+    if (
+      clientX < boardRect.left ||
+      clientX > boardRect.right ||
+      clientY < boardRect.top ||
+      clientY > boardRect.bottom
+    ) {
+      return null;
+    }
+    const cellSize = boardRect.width / SIZE;
+    const pointerCol = Math.floor((clientX - boardRect.left) / cellSize);
+    const pointerRow = Math.floor((clientY - boardRect.top) / cellSize);
+    return {
+      row: pointerRow - this.drag.anchorOffsetRow,
+      col: pointerCol - this.drag.anchorOffsetCol,
+    };
   }
 }

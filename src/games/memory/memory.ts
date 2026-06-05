@@ -222,7 +222,7 @@ export class MemoryRenderer {
     this.container.innerHTML = "";
 
     const wrapper = document.createElement("div");
-    wrapper.className = "memory";
+    wrapper.className = `memory memory--${this.state.difficulty}`;
 
     const config = DIFFICULTIES[this.state.difficulty];
 

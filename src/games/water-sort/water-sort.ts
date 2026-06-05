@@ -32,10 +32,16 @@ const COLORS = [
 ];
 
 const DIFFICULTIES: Record<WaterSortDifficulty, { colors: number; empty: number; steps: number }> = {
-  easy: { colors: 4, empty: 2, steps: 30 },
-  medium: { colors: 6, empty: 2, steps: 50 },
-  hard: { colors: 8, empty: 2, steps: 70 },
+  easy: { colors: 4, empty: 2, steps: 18 },
+  medium: { colors: 6, empty: 2, steps: 28 },
+  hard: { colors: 8, empty: 2, steps: 38 },
 };
+
+const GENERATION_ATTEMPTS = 24;
+
+function cloneTubes(tubes: Tube[]): Tube[] {
+  return tubes.map((tube) => [...tube]);
+}
 
 function generatePuzzle(colors: number, empty: number, steps: number): Tube[] {
   const tubes: Tube[] = [];
@@ -62,11 +68,17 @@ function generatePuzzle(colors: number, empty: number, steps: number): Tube[] {
 
 export function createWaterSortGame(difficulty: WaterSortDifficulty = "medium"): WaterSortState {
   const config = DIFFICULTIES[difficulty];
-  let tubes: Tube[] = [];
+  let tubes: Tube[] | null = null;
 
-  do {
-    tubes = generatePuzzle(config.colors, config.empty, config.steps);
-  } while (isWon(tubes) || !hasAnyMove(tubes));
+  for (let attempt = 0; attempt < GENERATION_ATTEMPTS; attempt++) {
+    const candidate = generatePuzzle(config.colors, config.empty, config.steps + attempt);
+    if (!isWon(candidate) && hasAnyMove(candidate)) {
+      tubes = candidate;
+      break;
+    }
+  }
+
+  tubes ??= createFallbackPuzzle(config.colors, config.empty);
 
   return {
     tubes,
@@ -74,10 +86,38 @@ export function createWaterSortGame(difficulty: WaterSortDifficulty = "medium"):
     moves: 0,
     bestMoves: getPersonalBest("water-sort")?.score ?? 0,
     won: false,
-    gameOver: false,
+    gameOver: !hasAnyMove(tubes),
     scoreSubmitted: false,
     difficulty,
   };
+}
+
+function createFallbackPuzzle(colors: number, empty: number): Tube[] {
+  const tubes: Tube[] = Array.from({ length: colors + empty }, () => []);
+  const pool = Array.from({ length: colors * CAPACITY }, (_, index) => Math.floor(index / CAPACITY) as ColorId);
+
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+
+  for (let i = 0; i < pool.length; i++) {
+    tubes[Math.floor(i / CAPACITY)].push(pool[i]);
+  }
+
+  if (isWon(tubes) || !hasAnyMove(tubes)) {
+    return createSeededFallback(colors, empty);
+  }
+
+  return cloneTubes(tubes);
+}
+
+function createSeededFallback(colors: number, empty: number): Tube[] {
+  const tubes: Tube[] = Array.from({ length: colors }, (_, tube) =>
+    Array.from({ length: CAPACITY }, (_, slot) => ((tube + slot) % colors) as ColorId),
+  );
+  for (let i = 0; i < empty; i++) tubes.push([]);
+  return tubes;
 }
 
 function topRun(tube: Tube): { color: ColorId; count: number } | null {

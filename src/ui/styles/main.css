@@ -1114,12 +1114,25 @@ body::before {
 /* ---- Minesweeper ---- */
 
 .minesweeper {
-  max-width: 400px;
+  width: min(100%, 420px);
+  max-width: 100vw;
   margin: 0 auto;
   padding: var(--space-md);
+  padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  --ms-cell-size: clamp(28px, 8.6vw, 36px);
+}
+
+.minesweeper--intermediate,
+.minesweeper--expert {
+  width: 100%;
+  max-width: min(100vw, 760px);
+}
+
+.minesweeper--expert {
+  --ms-cell-size: 32px;
 }
 
 
@@ -1182,20 +1195,32 @@ body::before {
 }
 
 .minesweeper__board {
+  width: max-content;
+  max-width: 100%;
+  align-self: center;
   background: #ffe2d0;
   border: 5px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 6px;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: manipulation;
+  touch-action: pan-x;
   box-shadow: var(--shadow-premium);
+  overflow: visible;
+}
+
+.minesweeper--intermediate .minesweeper__board,
+.minesweeper--expert .minesweeper__board {
+  align-self: stretch;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
 }
 
 .ms-cell {
-  aspect-ratio: 1;
+  width: var(--ms-cell-size);
+  height: var(--ms-cell-size);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1442,6 +1467,18 @@ body::before {
   background: rgba(255, 243, 232, 0.85);
   cursor: pointer;
   box-shadow: inset 0 -2px 0 rgba(75, 48, 53, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.block-blast__cell::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s ease;
 }
 
 .block-blast__cell:hover {
@@ -1450,14 +1487,22 @@ body::before {
 
 .block-blast__cell--preview {
   border-color: var(--color-green) !important;
-  box-shadow: inset 0 0 0 2px var(--color-green);
-  opacity: 0.85;
+  box-shadow: inset 0 0 0 2px var(--color-green), inset 0 -2px 0 rgba(75, 48, 53, 0.08);
+}
+
+.block-blast__cell--preview::after {
+  background: var(--preview-color, var(--color-green));
+  opacity: 0.68;
 }
 
 .block-blast__cell--invalid {
   border-color: var(--color-danger) !important;
-  box-shadow: inset 0 0 0 2px var(--color-danger);
-  opacity: 0.6;
+  box-shadow: inset 0 0 0 2px var(--color-danger), inset 0 -2px 0 rgba(75, 48, 53, 0.08);
+}
+
+.block-blast__cell--invalid::after {
+  background: repeating-linear-gradient(45deg, rgba(255, 91, 91, 0.38) 0 5px, rgba(255, 91, 91, 0.1) 5px 10px);
+  opacity: 1;
 }
 
 .block-blast__tray {
@@ -1466,27 +1511,45 @@ body::before {
   gap: var(--space-sm);
 }
 
-.block-blast__shape {
+.block-blast__tray-slot {
   min-height: 94px;
   border: 3px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
   box-shadow: var(--shadow-premium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.block-blast__tray-slot--used {
+  opacity: 0.42;
+  background: rgba(255, 243, 232, 0.65);
+}
+
+.block-blast__shape {
   display: grid;
   gap: 4px;
   justify-content: center;
   align-content: center;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
 }
 
-.block-blast__shape--selected {
-  background: var(--color-warning);
-  box-shadow: var(--shadow-premium), var(--glow-cyan);
+.block-blast__shape:active {
+  cursor: grabbing;
 }
 
-.block-blast__shape--used {
-  opacity: 0.34;
-  filter: grayscale(0.7);
+.block-blast__drag-ghost .block-blast__shape {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  min-height: 0;
+  padding: 0;
+}
+
+.block-blast__mini--empty {
+  visibility: hidden;
 }
 
 .block-blast__mini {
@@ -1553,15 +1616,23 @@ body::before {
   width: min(100%, 500px);
   margin: 0 auto;
   padding: var(--space-md);
+  padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  --memory-card-size: minmax(58px, 1fr);
+  --memory-gap: var(--space-sm);
+}
+
+.memory--hard {
+  width: min(100%, 460px);
+  --memory-gap: 6px;
 }
 
 .memory__grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-sm);
+  grid-template-columns: repeat(4, var(--memory-card-size));
+  gap: var(--memory-gap);
   background: #ffe2d0;
   border: 5px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1720,7 +1791,8 @@ body::before {
   -webkit-user-select: none;
   user-select: none;
   touch-action: none;
-  transition: transform 0.1s ease, outline 0.1s ease;
+  transition: transform 0.14s ease, outline 0.1s ease, box-shadow 0.14s ease;
+  will-change: transform;
 }
 
 .solitaire__pile .card + .card {
@@ -1755,6 +1827,10 @@ body::before {
   z-index: 2;
 }
 
+.card--drawn {
+  animation: solitaire-draw 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 .solitaire__slot {
   background: rgba(255, 226, 208, 0.72);
   align-items: center;
@@ -1768,24 +1844,100 @@ body::before {
 @media (max-width: 680px) {
   .puzzle-header {
     flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+  }
+
+  .puzzle-header h1 {
+    font-size: var(--font-size-lg);
+  }
+
+  .puzzle-header p {
+    font-size: var(--font-size-xs);
   }
 
   .puzzle-stats {
     justify-content: flex-start;
   }
 
+  .puzzle-stats span {
+    min-width: 62px;
+    padding: 4px 7px;
+  }
+
   .water-sort__rack {
     grid-template-columns: repeat(3, minmax(60px, 1fr));
   }
 
+  .memory {
+    gap: var(--space-sm);
+  }
+
+  .memory--medium {
+    --memory-card-size: minmax(54px, 1fr);
+  }
+
+  .memory--hard {
+    --memory-card-size: minmax(44px, 1fr);
+    --memory-gap: 5px;
+    padding-top: var(--space-sm);
+  }
+
+  .memory__grid {
+    padding: 6px;
+    border-width: 4px;
+  }
+
+  .memory__card {
+    border-width: 2px;
+    font-size: clamp(1.25rem, 6.2vw, 1.8rem);
+  }
+
+  .minesweeper {
+    padding: var(--space-sm);
+    padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom));
+    gap: var(--space-sm);
+    --ms-cell-size: clamp(30px, 8.8vw, 34px);
+  }
+
+  .minesweeper--intermediate {
+    --ms-cell-size: 32px;
+  }
+
+  .minesweeper--expert {
+    --ms-cell-size: 31px;
+  }
+
+  .minesweeper__header {
+    padding: var(--space-sm);
+  }
+
+  .minesweeper__counter,
+  .minesweeper__timer {
+    font-size: 17px;
+    min-width: 58px;
+  }
+
   .solitaire {
-    --card-width: 48px;
-    --card-height: 68px;
-    --card-overlap: -48px;
+    --card-width: clamp(50px, calc((100vw - 42px) / 7), 58px);
+    --card-height: calc(var(--card-width) * 1.42);
+    --card-overlap: calc(var(--card-height) * -0.68);
+    padding: var(--space-sm);
+    gap: var(--space-sm);
   }
 
   .solitaire__top {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(6, var(--card-width));
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .solitaire__waste {
+    grid-column: 2;
+  }
+
+  .solitaire__foundation:nth-of-type(3) {
+    grid-column: 3;
   }
 
   .solitaire__gap {
@@ -1794,13 +1946,22 @@ body::before {
 
   .card {
     border-width: 2px;
-    font-size: var(--font-size-xs);
-    padding: 4px;
+    font-size: clamp(0.78rem, 3vw, 0.95rem);
+    padding: 5px;
+    border-radius: 7px;
   }
 
   .solitaire__tableau {
+    grid-template-columns: repeat(7, var(--card-width));
+    justify-content: center;
     gap: 3px;
     padding: 5px;
+    min-height: 300px;
+    overflow-x: hidden;
+  }
+
+  .solitaire__pile {
+    min-height: 280px;
   }
 }
 
@@ -1810,6 +1971,12 @@ body::before {
   0% { transform: scale(0); opacity: 0; }
   50% { transform: scale(1.12); opacity: 0.9; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes solitaire-draw {
+  0% { transform: translateX(calc(var(--card-width) * -1 - 6px)) rotateY(82deg) scale(0.92); opacity: 0.4; }
+  55% { transform: translateX(5px) rotateY(0deg) scale(1.04); opacity: 1; }
+  100% { transform: translateX(0) rotateY(0deg) scale(1); opacity: 1; }
 }
 
 @keyframes slide-in {

@@ -422,7 +422,7 @@ export class MinesweeperRenderer {
     const diff = this.state.difficulty;
 
     this.container.innerHTML = `
-      <div class="minesweeper">
+      <div class="minesweeper minesweeper--${diff}">
         <div class="minesweeper__difficulty">
           <div class="toggle-group" id="ms-diff-toggle">
             <button class="toggle-btn ${diff === "beginner" ? "toggle-btn--active" : ""}" data-value="beginner">Easy</button>
@@ -438,7 +438,7 @@ export class MinesweeperRenderer {
         </div>
 
         <div class="minesweeper__board" id="ms-board"
-             style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:2px;">
+             style="display:grid;grid-template-columns:repeat(${cols},var(--ms-cell-size));grid-auto-rows:var(--ms-cell-size);gap:2px;">
           ${this.renderBoardHTML()}
         </div>
 

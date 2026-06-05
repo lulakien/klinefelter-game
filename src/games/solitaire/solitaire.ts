@@ -150,6 +150,7 @@ export class SolitaireRenderer {
   } | null = null;
   private boundOnMove: (e: PointerEvent) => void;
   private boundOnUp: (e: PointerEvent) => void;
+  private animatingWasteCardId: string | null = null;
 
   constructor(state: SolitaireState) {
     this.state = state;
@@ -178,6 +179,7 @@ export class SolitaireRenderer {
       const card = this.state.stock.pop()!;
       card.faceUp = true;
       this.state.waste.push(card);
+      this.animatingWasteCardId = card.id;
       this.state.moves++;
       playSfx("hit");
     } else if (this.state.waste.length > 0) {
@@ -403,6 +405,12 @@ export class SolitaireRenderer {
     const wasteCard = this.state.waste[this.state.waste.length - 1];
     if (wasteCard) {
       const wEl = this.buildCardElement(wasteCard, this.isSelected({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
+      if (this.animatingWasteCardId === wasteCard.id) {
+        wEl.classList.add("card--drawn");
+        wEl.addEventListener("animationend", () => {
+          if (this.animatingWasteCardId === wasteCard.id) this.animatingWasteCardId = null;
+        }, { once: true });
+      }
       wEl.addEventListener("click", () => this.select({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
       wEl.addEventListener("dblclick", () => this.autoFoundation({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
       wEl.addEventListener("pointerdown", (e) => this.startDrag(e, { zone: "waste", pile: 0, index: this.state.waste.length - 1 }, wEl));

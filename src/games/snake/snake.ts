@@ -13,9 +13,9 @@ import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 const GRID = 20;
 const CELL = 24; // px per cell
 const GAP = 2;
-const BASE_TICK_MS = 130; // starting speed
-const MIN_TICK_MS = 60;   // fastest speed
-const SPEED_INCREMENT = 2; // ms faster per food eaten
+const BASE_TICK_MS = 155; // starting speed
+const MIN_TICK_MS = 85;   // fastest speed
+const SPEED_INCREMENT = 1.5; // ms faster per food eaten
 const CANVAS_PADDING = 16;
 const DIR_QUEUE_MAX = 2;
 
@@ -250,8 +250,11 @@ export class SnakeRenderer {
     this.canvas.addEventListener("touchend", this.onTouch, { passive: false });
 
     // Start loop
+    cancelAnimationFrame(this.animFrame);
     this.state.lastTimestamp = performance.now();
-    this.tick();
+    this.draw();
+    this.updateUI();
+    this.animFrame = requestAnimationFrame(() => this.tick());
   }
 
   destroy(): void {
@@ -272,13 +275,18 @@ export class SnakeRenderer {
 
     this.state.tickTimer += dt;
     const tickMs = Math.max(MIN_TICK_MS, BASE_TICK_MS - (this.state.snake.length - 3) * SPEED_INCREMENT);
+    let stepped = false;
     while (this.state.tickTimer >= tickMs) {
       this.state.tickTimer -= tickMs;
       stepSnake(this.state);
+      stepped = true;
+      if (this.state.gameOver) break;
     }
 
-    this.draw();
-    this.updateUI();
+    if (stepped || this.state.gameOver) {
+      this.draw();
+      this.updateUI();
+    }
 
     this.animFrame = requestAnimationFrame(() => this.tick());
   }
