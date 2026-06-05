@@ -2218,3 +2218,34 @@ html.reduced-motion *::after {
   margin-top: var(--space-lg);
 }
 
+
+/* ---- Game Error ---- */
+
+.game-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  text-align: center;
+  min-height: 60vh;
+}
+
+.game-error h2 {
+  color: var(--color-cocoa);
+  font-size: var(--font-size-xl);
+  margin: 0;
+}
+
+.game-error p {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.game-error__actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+

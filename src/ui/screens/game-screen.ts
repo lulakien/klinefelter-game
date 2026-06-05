@@ -1,5 +1,5 @@
 import { getGameById, GAME_LOADERS } from "../../app/game-registry.js";
-import { setTopBarStatus, showErrorFallback } from "../../app/app-shell.js";
+import { setTopBarStatus, showErrorFallback, getContentElement } from "../../app/app-shell.js";
 import { getGameOfflineStatus } from "../../offline/package-manager.js";
 import { getSWStatus } from "../../pwa/register-sw.js";
 import { navigate } from "../../app/router.js";
@@ -97,9 +97,22 @@ export async function renderGameScreen(
     // Only show error if this is still the current load
     if (myGeneration === loadGeneration) {
       console.error(`Failed to load game "${gameId}":`, err);
-      showErrorFallback(
-        `Failed to load ${escapeHtml(game.name)}. It may not be downloaded for offline use.`,
-      );
+      const errorContent = getContentElement();
+      if (errorContent) {
+        errorContent.innerHTML = `
+          <div class="game-error">
+            <h2>Failed to load ${escapeHtml(game.name)}</h2>
+            <p>It may not be downloaded for offline use.</p>
+            <div class="game-error__actions">
+              <button class="btn btn--primary" id="btn-retry-game">Try Again</button>
+              <a class="btn btn--secondary" href="#/">Back to Home</a>
+            </div>
+          </div>
+        `;
+        errorContent.querySelector("#btn-retry-game")?.addEventListener("click", () => {
+          renderGameScreen(errorContent, gameId);
+        });
+      }
       setTopBarStatus("");
     }
   }
