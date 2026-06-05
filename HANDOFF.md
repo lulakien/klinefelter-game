@@ -91,6 +91,7 @@ src/
     snake/                       🐍 Classic snake (~7.5 KB / 2.7 KB gzip)
     memory/                      🧠 Card matching (~4.5 KB / 1.7 KB gzip)
     tic-tac-toe/                 ⭕ X and O pass-and-play with AI (~5.8 KB / 2.0 KB gzip)
+    connect-four/                🔴 Drop discs to connect four in a row (~7.5 KB / 2.5 KB gzip)
       index.ts                   Entry & cleanup
       block-blast.ts             8×8 grid, 3 shapes at a time, row/column clear
 
@@ -124,6 +125,7 @@ public/
 | Snake (lazy) | ~7 KB | ~2.6 KB | <1 MB |
 | Memory (lazy) | ~4.5 KB | ~1.7 KB | <1 MB |
 | Tic-Tac-Toe (lazy) | ~5.8 KB | ~2.0 KB | <1 MB |
+| Connect Four (lazy) | ~7.5 KB | ~2.5 KB | <1 MB |
 | SW precache | 12 files, ~71 KB | — | — |
 
 No external CDNs, fonts, analytics, or UI frameworks.
@@ -172,8 +174,8 @@ No external CDNs, fonts, analytics, or UI frameworks.
 
 ## What Works
 
-- ✅ Home screen loads, shows 9 game cards with live cache status
-- ✅ All 9 games are playable (Tiny Drift Karts, 2048, Minesweeper, Solitaire, Water Sort, Block Blast, Snake, Memory, Tic-Tac-Toe)
+- ✅ Home screen loads, shows 10 game cards with live cache status
+- ✅ All 10 games are playable (Tiny Drift Karts, 2048, Minesweeper, Solitaire, Water Sort, Block Blast, Snake, Memory, Tic-Tac-Toe, Connect Four)
 - ✅ Warm toy-arcade visual design: coral/peach backgrounds, cocoa top bar, thick borders, rounded shapes
 - ✅ Settings screen: quality mode toggle (persists), audio prefs, data display, nickname
 - ✅ Offline manager: real SW status, connection state, storage estimate, download/remove buttons
@@ -197,7 +199,7 @@ No external CDNs, fonts, analytics, or UI frameworks.
 - **Per-game asset manifests:** The package manager downloads by loading the game module (which the SW caches). Real per-game asset manifests with versioned packages, progress UI, and low/high quality asset selection are not built (deferred per PROJECT.txt Phase 2+).
 - **Online multiplayer / rooms:** No backend exists. This is intentional — PROJECT.txt defers this to Phase 4+.
 - **Same-device multiplayer:** Not built (Phase 3).
-- **More games:** Phase 2 complete — 8 games built (Tiny Drift Karts, 2048, Minesweeper, Solitaire, Water Sort, Block Blast, Snake, Memory, Tic-Tac-Toe).
+- **More games:** Phase 2 complete — 8 games built (Tiny Drift Karts, 2048, Minesweeper, Solitaire, Water Sort, Block Blast, Snake, Memory, Tic-Tac-Toe, Connect Four).
 - **E2E / performance tests:** Not built.
 - **Bundle size CI checks:** Not built.
 - **`offline-manager-ui.ts`:** Contains `createActionButton` which is exported but unused. The offline screen builds its own buttons inline. Safe to remove or refactor.
@@ -232,7 +234,7 @@ npm run preview  # Serve the production build locally
 
 1. ~~**Visual design pass** — the most impactful next step given user feedback~~ ✅ DONE
 2. **Real device testing** — car game touch controls, PWA install flow on iOS/Android
-3. ~~**Phase 2 complete:** Add Snake, Memory, and Tic-Tac-Toe games~~ ✅ DONE
+3. ~~**Phase 2 complete:** Add Snake, Memory, Tic-Tac-Toe, and Connect Four games~~ ✅ DONE
 4. **Phase 3:** Same-device multiplayer (checkers, backgammon, pass-and-play)
 5. **Phase 4:** Online room system (backend, WebSocket, room codes)
 6. **Phase 5:** Werewolf/Vampire Village social deduction game
