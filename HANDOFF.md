@@ -13,7 +13,7 @@ Built 2026-06-02. Updated 2026-06-05. Vite + TypeScript + Vanilla TS. No React. 
     → app shell mounts (warm cocoa top bar + content area)
     → SW registers (Workbox, precaches 12 app-shell files)
     → Router starts (hash-based: #/, #/games/:id, #/settings, #/offline)
-    → Home screen renders 6 game cards from registry
+    → Home screen renders 8 game cards from registry
     → Click a card → hash changes → router dispatches
       → game-screen.ts dynamically imports the game chunk
       → game mounts into the content area
@@ -144,8 +144,8 @@ No external CDNs, fonts, analytics, or UI frameworks.
 
 ## What Works
 
-- ✅ Home screen loads, shows 6 game cards with live cache status
-- ✅ All 6 games are playable (Tiny Drift Karts, 2048, minesweeper, solitaire, water sort, block blast)
+- ✅ Home screen loads, shows 8 game cards with live cache status
+- ✅ All 8 games are playable (Tiny Drift Karts, 2048, Minesweeper, Solitaire, Water Sort, Block Blast, Snake, Memory)
 - ✅ Warm toy-arcade visual design: coral/peach backgrounds, cocoa top bar, thick borders, rounded shapes
 - ✅ Settings screen: quality mode toggle (persists), audio prefs, data display, nickname
 - ✅ Offline manager: real SW status, connection state, storage estimate, download/remove buttons
@@ -166,7 +166,7 @@ No external CDNs, fonts, analytics, or UI frameworks.
 - **Per-game asset manifests:** The package manager downloads by loading the game module (which the SW caches). Real per-game asset manifests with versioned packages, progress UI, and low/high quality asset selection are not built (deferred per PROJECT.txt Phase 2+).
 - **Online multiplayer / rooms:** No backend exists. This is intentional — PROJECT.txt defers this to Phase 4+.
 - **Same-device multiplayer:** Not built (Phase 3).
-- **More games:** Memory is planned but not built. Snake, Solitaire, Water Sort, and Block Blast completed (Phase 2).
+- **More games:** Phase 2 complete — 8 games built (Tiny Drift Karts, 2048, Minesweeper, Solitaire, Water Sort, Block Blast, Snake, Memory).
 - **E2E / performance tests:** Not built.
 - **Bundle size CI checks:** Not built.
 - **`offline-manager-ui.ts`:** Contains `createActionButton` which is exported but unused. The offline screen builds its own buttons inline. Safe to remove or refactor.

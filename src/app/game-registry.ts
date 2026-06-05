@@ -123,6 +123,22 @@ const registry: GameMeta[] = [
     entryModule: "../games/snake/index.js",
     tags: ["singleplayer", "offline", "arcade", "classic", "high-score"],
   },
+  {
+    id: "memory",
+    name: "Memory",
+    description: "Flip cards to find matching pairs. How few moves can you win in?",
+    version: "0.1.0",
+    offlineSupport: "full",
+    multiplayerSupport: "none",
+    estimatedSizeLow: 50_000,
+    estimatedSizeHigh: 120_000,
+    supportsUltraLow: true,
+    supportsHighQuality: true,
+    controls: ["touch", "keyboard"],
+    requiresBackend: false,
+    entryModule: "../games/memory/index.js",
+    tags: ["singleplayer", "offline", "puzzle", "casual", "cards"],
+  },
 ];
 
 /** Get all registered games. */
@@ -151,4 +167,5 @@ export const GAME_LOADERS: Record<string, () => Promise<any>> = {
   "water-sort": () => import(/* viteChunkName: "game-water-sort" */ "../games/water-sort/index.js"),
   "block-blast": () => import(/* viteChunkName: "game-block-blast" */ "../games/block-blast/index.js"),
   "snake": () => import(/* viteChunkName: "game-snake" */ "../games/snake/index.js"),
+  "memory": () => import(/* viteChunkName: "game-memory" */ "../games/memory/index.js"),
 };
