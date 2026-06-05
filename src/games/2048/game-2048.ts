@@ -449,6 +449,14 @@ export class Game2048Renderer {
     document
       .getElementById("btn-2048-restart")
       ?.addEventListener("click", () => this.restart());
+
+    // Bind keep playing button
+    document
+      .getElementById("btn-2048-keep-playing")
+      ?.addEventListener("click", () => {
+        this.state.keepPlaying = true;
+        this.render();
+      });
   }
 
   private renderBoardHTML(): string {
@@ -494,6 +502,7 @@ export class Game2048Renderer {
         <div class="game-2048__overlay-content">
           <h2>You Win!</h2>
           <p>Score: ${this.state.score}</p>
+          <button class="btn btn--primary" id="btn-2048-keep-playing">Keep Playing</button>
         </div>
       </div>
     `;

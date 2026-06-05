@@ -201,7 +201,7 @@ npm run preview  # Serve the production build locally
 
 1. ~~**Visual design pass** — the most impactful next step given user feedback~~ ✅ DONE
 2. **Real device testing** — car game touch controls, PWA install flow on iOS/Android
-3. **Phase 2 complete:** Add Snake and Memory games
+3. ~~**Phase 2 complete:** Add Snake and Memory games~~ ✅ DONE
 4. **Phase 3:** Same-device multiplayer (checkers, backgammon, pass-and-play)
 5. **Phase 4:** Online room system (backend, WebSocket, room codes)
 6. **Phase 5:** Werewolf/Vampire Village social deduction game

@@ -324,6 +324,10 @@ export class MinesweeperRenderer {
 
   destroy(): void {
     if (this.timerInterval) clearInterval(this.timerInterval);
+    if (this.touchStartTimer) {
+      clearTimeout(this.touchStartTimer);
+      this.touchStartTimer = null;
+    }
     if (this.container) {
       this.container.removeEventListener("contextmenu", this.onContextMenu);
     }

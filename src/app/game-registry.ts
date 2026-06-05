@@ -139,6 +139,22 @@ const registry: GameMeta[] = [
     entryModule: "../games/memory/index.js",
     tags: ["singleplayer", "offline", "puzzle", "casual", "cards"],
   },
+  {
+    id: "tic-tac-toe",
+    name: "Tic-Tac-Toe",
+    description: "Classic X and O. Play with a friend or challenge the AI.",
+    version: "0.1.0",
+    offlineSupport: "full",
+    multiplayerSupport: "same-device",
+    estimatedSizeLow: 30_000,
+    estimatedSizeHigh: 80_000,
+    supportsUltraLow: true,
+    supportsHighQuality: true,
+    controls: ["touch", "keyboard"],
+    requiresBackend: false,
+    entryModule: "../games/tic-tac-toe/index.js",
+    tags: ["multiplayer", "same-device", "offline", "classic", "board"],
+  },
 ];
 
 /** Get all registered games. */
@@ -168,4 +184,5 @@ export const GAME_LOADERS: Record<string, () => Promise<any>> = {
   "block-blast": () => import(/* viteChunkName: "game-block-blast" */ "../games/block-blast/index.js"),
   "snake": () => import(/* viteChunkName: "game-snake" */ "../games/snake/index.js"),
   "memory": () => import(/* viteChunkName: "game-memory" */ "../games/memory/index.js"),
+  "tic-tac-toe": () => import(/* viteChunkName: "game-tic-tac-toe" */ "../games/tic-tac-toe/index.js"),
 };

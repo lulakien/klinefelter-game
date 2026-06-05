@@ -13,7 +13,7 @@ export async function mount(
   _meta: GameMeta,
 ): Promise<() => void> {
   // Prevent page scrolling while playing
-  container.style.overflow = "auto";
+  container.style.overflow = "hidden";
 
   // Create game state
   const state = createGame();

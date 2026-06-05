@@ -5,7 +5,7 @@ import { getStatusBadge, formatBytes } from "../../offline/offline-manager-ui.js
 import { onSWStatusChange, getSWStatus, getDeferredPrompt, clearDeferredPrompt, type SWStatus } from "../../pwa/register-sw.js";
 import { setScreenCleanup } from "../../app/app-shell.js";
 import { getPersonalBest } from "../../settings/scores-store.js";
-import type { GameMeta } from "../../shared/game-types.js";
+import type { GameMeta, GameOfflineStatus } from "../../shared/game-types.js";
 
 /**
  * Home screen — the game launcher.
@@ -177,7 +177,12 @@ async function updateGameCardStatus(gameId: string): Promise<void> {
   if (!statusEl) return;
 
   const card = statusEl.closest(".game-card") as HTMLElement | null;
-  const status = await getGameOfflineStatus(gameId);
+  let status: GameOfflineStatus;
+  try {
+    status = await getGameOfflineStatus(gameId);
+  } catch {
+    status = "not-downloaded";
+  }
   const swStatus = getSWStatus();
 
   let badge = getStatusBadge(status);

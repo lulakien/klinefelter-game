@@ -58,63 +58,6 @@ function shuffle<T>(arr: T[]): void {
   }
 }
 
-function pickCard(state: MemoryState, index: number): void {
-  if (state.locked || state.won) return;
-  const card = state.cards[index];
-  if (card.flipped || card.matched) return;
-
-  card.flipped = true;
-  playSfx("click");
-
-  if (state.firstPick === null) {
-    state.firstPick = index;
-    return;
-  }
-
-  state.secondPick = index;
-  state.moves++;
-  state.locked = true;
-
-  const first = state.cards[state.firstPick];
-  const second = state.cards[state.secondPick];
-
-  if (first.symbol === second.symbol) {
-    // Match!
-    first.matched = true;
-    second.matched = true;
-    playSfx("success");
-    state.firstPick = null;
-    state.secondPick = null;
-    state.locked = false;
-
-    if (state.cards.every((c) => c.matched)) {
-      state.won = true;
-      endGame(state);
-    }
-  } else {
-    // Mismatch — flip back after delay
-    const a = state.firstPick;
-    const b = state.secondPick;
-    setTimeout(() => {
-      state.cards[a].flipped = false;
-      state.cards[b].flipped = false;
-      state.firstPick = null;
-      state.secondPick = null;
-      state.locked = false;
-      updateAllCards(state);
-    }, 700);
-  }
-}
-
-function endGame(state: MemoryState): void {
-  if (!state.scoreSubmitted) {
-    state.scoreSubmitted = true;
-    const newBest = state.bestMoves === 0 || state.moves < state.bestMoves;
-    if (newBest) state.bestMoves = state.moves;
-    saveScore("memory", state.moves, `${state.moves} moves`);
-  }
-}
-
 // ---- DOM Renderer ----
 
 export class MemoryRenderer {
@@ -122,6 +65,7 @@ export class MemoryRenderer {
   private container: HTMLElement | null = null;
   private movesEl: HTMLElement | null = null;
   private bestEl: HTMLElement | null = null;
+  private flipTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(state: MemoryState) {
     this.state = state;
@@ -169,7 +113,7 @@ export class MemoryRenderer {
     // Actions
     const actions = document.createElement("div");
     actions.className = "puzzle-actions";
-    actions.innerHTML = '<button class="btn btn--secondary" id="mem-restart">Restart</button>';
+    actions.innerHTML = '<button class="btn btn--secondary" id="mem-restart">Restart</button><a class="btn btn--secondary" href="#/">Back to Home</a>';
     const restartBtn = actions.querySelector("#mem-restart")!;
     restartBtn.addEventListener("click", () => this.reset());
 
@@ -182,6 +126,10 @@ export class MemoryRenderer {
   }
 
   destroy(): void {
+    if (this.flipTimeout) {
+      clearTimeout(this.flipTimeout);
+      this.flipTimeout = null;
+    }
     if (this.container) {
       this.container.innerHTML = "";
     }
@@ -189,8 +137,8 @@ export class MemoryRenderer {
 
   private handlePick(index: number): void {
     const before = this.state.moves;
-    pickCard(this.state, index);
-    updateAllCards(this.state);
+    this.pickCard(index);
+    this.updateAllCards(this.state);
 
     if (this.state.moves !== before && this.movesEl) {
       this.movesEl.textContent = String(this.state.moves);
@@ -212,11 +160,12 @@ export class MemoryRenderer {
       <div>
         <h2>You Win!</h2>
         <p>${this.state.moves} moves</p>
-        ${this.state.moves <= this.state.bestMoves ? "<p class='memory__new-best'>New Best!</p>" : ""}
-        <button class="btn btn--primary">Play Again</button>
+        ${this.state.moves < this.state.bestMoves ? "<p class='memory__new-best'>New Best!</p>" : ""}
+        <button class="btn btn--primary" id="mem-play-again">Play Again</button>
+        <a class="btn btn--secondary" href="#/">Back to Home</a>
       </div>
     `;
-    const btn = overlay.querySelector("button")!;
+    const btn = overlay.querySelector("#mem-play-again")!;
     btn.addEventListener("click", () => {
       overlay.remove();
       this.reset();
@@ -242,16 +191,77 @@ export class MemoryRenderer {
     const overlay = this.container?.querySelector(".memory__win");
     if (overlay) overlay.remove();
 
-    updateAllCards(this.state);
+    this.updateAllCards(this.state);
   }
-}
 
-/** Sync DOM cards with state — call after delayed flip-back. */
-function updateAllCards(state: MemoryState): void {
-  const cells = document.querySelectorAll(".memory__card");
-  cells.forEach((cell, i) => {
-    const card = state.cards[i];
-    cell.classList.toggle("memory__card--flipped", card.flipped || card.matched);
-    cell.classList.toggle("memory__card--matched", card.matched);
-  });
+
+  private pickCard(index: number): void {
+    const state = this.state;
+    if (state.locked || state.won) return;
+    const card = state.cards[index];
+    if (card.flipped || card.matched) return;
+
+    card.flipped = true;
+    playSfx("click");
+
+    if (state.firstPick === null) {
+      state.firstPick = index;
+      return;
+    }
+
+    state.secondPick = index;
+    state.moves++;
+    state.locked = true;
+
+    const first = state.cards[state.firstPick];
+    const second = state.cards[state.secondPick];
+
+    if (first.symbol === second.symbol) {
+      // Match!
+      first.matched = true;
+      second.matched = true;
+      playSfx("success");
+      state.firstPick = null;
+      state.secondPick = null;
+      state.locked = false;
+
+      if (state.cards.every((c) => c.matched)) {
+        state.won = true;
+        this.endGame();
+      }
+    } else {
+      // Mismatch — flip back after delay
+      const a = state.firstPick;
+      const b = state.secondPick;
+      this.flipTimeout = setTimeout(() => {
+        this.flipTimeout = null;
+        state.cards[a].flipped = false;
+        state.cards[b].flipped = false;
+        state.firstPick = null;
+        state.secondPick = null;
+        state.locked = false;
+        this.updateAllCards(state);
+      }, 700);
+    }
+  }
+
+  private endGame(): void {
+    const state = this.state;
+    if (!state.scoreSubmitted) {
+      state.scoreSubmitted = true;
+      const newBest = state.bestMoves === 0 || state.moves < state.bestMoves;
+      if (newBest) state.bestMoves = state.moves;
+      saveScore("memory", state.moves, `${state.moves} moves`);
+    }
+  }
+  /** Sync DOM cards with state — call after delayed flip-back. */
+  private updateAllCards(state: MemoryState): void {
+    if (!this.container) return;
+    const cells = this.container.querySelectorAll(".memory__card");
+    cells.forEach((cell, i) => {
+      const card = state.cards[i];
+      cell.classList.toggle("memory__card--flipped", card.flipped || card.matched);
+      cell.classList.toggle("memory__card--matched", card.matched);
+    });
+  }
 }

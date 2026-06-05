@@ -212,9 +212,15 @@ export class SnakeRenderer {
     hint.className = "snake__hint";
     hint.textContent = "Arrow keys or swipe to move";
 
+    // Actions
+    const actions = document.createElement("div");
+    actions.className = "puzzle-actions";
+    actions.innerHTML = '<a class="btn btn--secondary" href="#/">Back to Home</a>';
+
     wrapper.appendChild(header);
     wrapper.appendChild(boardWrap);
     wrapper.appendChild(hint);
+    wrapper.appendChild(actions);
     container.appendChild(wrapper);
 
     // Input
@@ -451,6 +457,7 @@ export class SnakeRenderer {
     this.state.scoreSubmitted = false;
     this.state.tickTimer = 0;
     this.state.growPending = false;
+    this.state.lastTimestamp = performance.now();
     this.state.bestScore = Math.max(this.state.bestScore, fresh.bestScore);
   }
 }

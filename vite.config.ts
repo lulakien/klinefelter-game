@@ -29,6 +29,15 @@ export default defineConfig({
           if (id.includes("games/block-blast/")) {
             return "game-block-blast";
           }
+          if (id.includes("games/snake/")) {
+            return "game-snake";
+          }
+          if (id.includes("games/memory/")) {
+            return "game-memory";
+          }
+          if (id.includes("games/tic-tac-toe/")) {
+            return "game-tic-tac-toe";
+          }
         },
       },
     },
@@ -65,8 +74,8 @@ export default defineConfig({
         name: "Klinefelter Game",
         short_name: "KGame",
         description: "A low-data, offline-ready, friend-only mini game hub.",
-        theme_color: "#1a1a2e",
-        background_color: "#1a1a2e",
+        theme_color: "#694046",
+        background_color: "#f39478",
         display: "standalone",
         orientation: "any",
         icons: [

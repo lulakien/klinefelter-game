@@ -78,7 +78,7 @@ export function getPersonalBest(gameId: string): ScoreRecord | null {
 
 function compareScores(gameId: string, a: ScoreRecord, b: ScoreRecord): number {
   // These games record completion time or move count, so lower is better.
-  if (gameId === "minesweeper" || gameId === "solitaire" || gameId === "water-sort") {
+  if (gameId === "minesweeper" || gameId === "solitaire" || gameId === "water-sort" || gameId === "memory" || gameId === "car-arena") {
     return a.score - b.score;
   }
   return b.score - a.score;
