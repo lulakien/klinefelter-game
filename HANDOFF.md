@@ -13,7 +13,7 @@ Built 2026-06-02. Updated 2026-06-05. Vite + TypeScript + Vanilla TS. No React. 
     → app shell mounts (warm cocoa top bar + content area)
     → SW registers (Workbox, precaches 12 app-shell files)
     → Router starts (hash-based: #/, #/games/:id, #/settings, #/offline)
-    → Home screen renders 8 game cards from registry
+    → Home screen renders 10 game cards from registry with quick actions (Scores, Settings, Offline)
     → Click a card → hash changes → router dispatches
       → game-screen.ts dynamically imports the game chunk
       → game mounts into the content area
@@ -42,6 +42,7 @@ src/
     screens/
       home-screen.ts             Game launcher with live cache-status cards
       settings-screen.ts         Quality mode, audio, performance toggles
+      scores-screen.ts           Personal bests and history per game
       offline-screen.ts          SW status, storage estimate, download/remove
       game-screen.ts             Lazy-load boundary (see BUGFIXES)
     styles/
@@ -174,10 +175,11 @@ No external CDNs, fonts, analytics, or UI frameworks.
 
 ## What Works
 
-- ✅ Home screen loads, shows 10 game cards with live cache status
+- ✅ Home screen loads, shows 10 game cards with quick access to High Scores with live cache status
 - ✅ All 10 games are playable (Tiny Drift Karts, 2048, Minesweeper, Solitaire, Water Sort, Block Blast, Snake, Memory, Tic-Tac-Toe, Connect Four)
 - ✅ Warm toy-arcade visual design: coral/peach backgrounds, cocoa top bar, thick borders, rounded shapes
 - ✅ Settings screen: quality mode toggle (persists), audio prefs, data display, nickname
+- ✅ High Scores screen: personal bests per game with top-5 history, accessible from home
 - ✅ Offline manager: real SW status, connection state, storage estimate, download/remove buttons
 - ✅ PWA: service worker, manifest, app shell precached for offline
 - ✅ Lazy loading: each game in its own chunk, loaded only on navigation
