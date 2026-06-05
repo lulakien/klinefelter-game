@@ -15,6 +15,7 @@ import { registerSW, onSWStatusChange } from "./pwa/register-sw.js";
 import { renderHomeScreen } from "./ui/screens/home-screen.js";
 import { renderSettingsScreen } from "./ui/screens/settings-screen.js";
 import { renderOfflineScreen } from "./ui/screens/offline-screen.js";
+import { renderScoresScreen } from "./ui/screens/scores-screen.js";
 import { renderGameScreen, destroyCurrentGame } from "./ui/screens/game-screen.js";
 import { playSfx } from "./app/audio-manager.js";
 
@@ -56,6 +57,14 @@ on("/offline", () => {
   const content = getContentElement();
   clearContent();
   renderOfflineScreen(content);
+});
+
+on("/scores", () => {
+  destroyCurrentGame();
+  triggerScreenCleanup();
+  const content = getContentElement();
+  clearContent();
+  renderScoresScreen(content);
 });
 
 on("/games/:gameId", (params) => {

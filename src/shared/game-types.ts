@@ -60,7 +60,7 @@ export type GameOfflineStatus =
 
 // ---- App Routes ----
 
-export type Route = "home" | "game" | "settings" | "offline";
+export type Route = "home" | "game" | "settings" | "offline" | "scores";
 
 export interface RouteState {
   route: Route;
