@@ -13,10 +13,11 @@ import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 const GRID = 20;
 const CELL = 24; // px per cell
 const GAP = 2;
-const BASE_TICK_MS = 160; // starting speed
-const MIN_TICK_MS = 70;   // fastest speed
-const SPEED_INCREMENT = 3; // ms faster per food eaten
+const BASE_TICK_MS = 130; // starting speed
+const MIN_TICK_MS = 60;   // fastest speed
+const SPEED_INCREMENT = 2; // ms faster per food eaten
 const CANVAS_PADDING = 16;
+const DIR_QUEUE_MAX = 2;
 
 // DESIGN.md warm palette
 const BG = "#ffe2d0";
@@ -39,7 +40,7 @@ interface SnakeState {
   snake: Point[];
   food: Point;
   direction: Direction;
-  nextDirection: Direction;
+  pendingDirections: Direction[];
   score: number;
   bestScore: number;
   gameOver: boolean;
@@ -61,7 +62,7 @@ export function createSnakeGame(): SnakeState {
     ],
     food: spawnFood([]),
     direction: "right",
-    nextDirection: "right",
+    pendingDirections: [],
     score: 0,
     bestScore: getPersonalBest("snake")?.score ?? 0,
     gameOver: false,
@@ -87,7 +88,14 @@ function spawnFood(snake: Point[]): Point {
 function stepSnake(state: SnakeState): void {
   if (state.gameOver) return;
 
-  state.direction = state.nextDirection;
+  // Apply next buffered direction
+  while (state.pendingDirections.length > 0) {
+    const next = state.pendingDirections.shift()!;
+    if (isValidTurn(state.direction, next)) {
+      state.direction = next;
+      break;
+    }
+  }
 
   const head = state.snake[0];
   const newHead: Point = { ...head };
@@ -144,16 +152,23 @@ function endGame(state: SnakeState): void {
   }
 }
 
-function changeDirection(state: SnakeState, dir: Direction): void {
+function isValidTurn(current: Direction, next: Direction): boolean {
   const opposites: Record<Direction, Direction> = {
     up: "down",
     down: "up",
     left: "right",
     right: "left",
   };
-  // Prevent reversing into self
-  if (opposites[dir] !== state.direction) {
-    state.nextDirection = dir;
+  return opposites[next] !== current;
+}
+
+function queueDirection(state: SnakeState, dir: Direction): void {
+  if (state.pendingDirections.length >= DIR_QUEUE_MAX) return;
+  const last = state.pendingDirections.length > 0
+    ? state.pendingDirections[state.pendingDirections.length - 1]
+    : state.direction;
+  if (isValidTurn(last, dir)) {
+    state.pendingDirections.push(dir);
   }
 }
 
@@ -296,21 +311,22 @@ export class SnakeRenderer {
       }
     }
 
-    // Draw food
+    // Draw food with pulse
     {
       const fx = pad + this.state.food.x * CELL + CELL / 2;
       const fy = pad + this.state.food.y * CELL + CELL / 2;
-      const r = (CELL - GAP * 2) / 2 - 2;
+      const pulse = Math.sin(performance.now() / 200) * 1.5;
+      const r = (CELL - GAP * 2) / 2 - 2 + pulse;
 
       ctx.fillStyle = FOOD;
       ctx.beginPath();
-      ctx.arc(fx, fy, r, 0, Math.PI * 2);
+      ctx.arc(fx, fy, Math.max(2, r), 0, Math.PI * 2);
       ctx.fill();
 
       // Shine highlight
       ctx.fillStyle = "rgba(255,255,255,0.4)";
       ctx.beginPath();
-      ctx.arc(fx - r * 0.3, fy - r * 0.3, r * 0.35, 0, Math.PI * 2);
+      ctx.arc(fx - r * 0.3, fy - r * 0.3, Math.max(1, r * 0.35), 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -328,8 +344,13 @@ export class SnakeRenderer {
       ctx.fill();
       ctx.stroke();
 
-      // Eyes on head
+      // Head shadow for depth
       if (i === 0) {
+        ctx.fillStyle = "rgba(0,0,0,0.06)";
+        roundRect(ctx, sx + 2, sy + 3, size, size, 8);
+        ctx.fill();
+
+        // Eyes
         ctx.fillStyle = "#fff";
         const eyeR = 3;
         const cx = sx + size / 2;
@@ -400,25 +421,25 @@ export class SnakeRenderer {
       case "w":
       case "W":
         e.preventDefault();
-        changeDirection(this.state, "up");
+        queueDirection(this.state, "up");
         break;
       case "ArrowDown":
       case "s":
       case "S":
         e.preventDefault();
-        changeDirection(this.state, "down");
+        queueDirection(this.state, "down");
         break;
       case "ArrowLeft":
       case "a":
       case "A":
         e.preventDefault();
-        changeDirection(this.state, "left");
+        queueDirection(this.state, "left");
         break;
       case "ArrowRight":
       case "d":
       case "D":
         e.preventDefault();
-        changeDirection(this.state, "right");
+        queueDirection(this.state, "right");
         break;
     }
   }
@@ -439,13 +460,13 @@ export class SnakeRenderer {
     if (e.type === "touchend" && this.touchStart) {
       const dx = touch.clientX - this.touchStart.x;
       const dy = touch.clientY - this.touchStart.y;
-      const threshold = 20;
+      const threshold = 18; // slightly more responsive
 
       if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
         if (Math.abs(dx) > Math.abs(dy)) {
-          changeDirection(this.state, dx > 0 ? "right" : "left");
+          queueDirection(this.state, dx > 0 ? "right" : "left");
         } else {
-          changeDirection(this.state, dy > 0 ? "down" : "up");
+          queueDirection(this.state, dy > 0 ? "down" : "up");
         }
       }
       this.touchStart = null;
@@ -453,12 +474,12 @@ export class SnakeRenderer {
       // Continuous direction changes during drag
       const dx = touch.clientX - this.touchStart.x;
       const dy = touch.clientY - this.touchStart.y;
-      const threshold = 28;
+      const threshold = 22;
       if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
         if (Math.abs(dx) > Math.abs(dy)) {
-          changeDirection(this.state, dx > 0 ? "right" : "left");
+          queueDirection(this.state, dx > 0 ? "right" : "left");
         } else {
-          changeDirection(this.state, dy > 0 ? "down" : "up");
+          queueDirection(this.state, dy > 0 ? "down" : "up");
         }
         this.touchStart = { x: touch.clientX, y: touch.clientY };
       }
@@ -470,7 +491,7 @@ export class SnakeRenderer {
     this.state.snake = fresh.snake;
     this.state.food = fresh.food;
     this.state.direction = fresh.direction;
-    this.state.nextDirection = fresh.nextDirection;
+    this.state.pendingDirections = [];
     this.state.score = 0;
     this.state.gameOver = false;
     this.state.scoreSubmitted = false;

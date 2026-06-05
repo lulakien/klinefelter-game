@@ -1,3 +1,8 @@
+/**
+ * Solitaire — Klondike with draw-one stock, tap and drag interactions,
+ * responsive card sizing, and warm toy-arcade design.
+ */
+
 import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 
@@ -31,6 +36,7 @@ interface SolitaireState {
 
 const SUITS: Suit[] = ["H", "D", "C", "S"];
 const RANKS = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+const SUIT_SYMBOLS: Record<Suit, string> = { H: "♥", D: "♦", C: "♣", S: "♠" };
 
 export function createSolitaireGame(): SolitaireState {
   const deck = SUITS.flatMap((suit) =>
@@ -131,12 +137,24 @@ function submitScore(state: SolitaireState): void {
   state.scoreSubmitted = true;
 }
 
+// ---- Renderer ----
+
 export class SolitaireRenderer {
   private container: HTMLElement | null = null;
   private state: SolitaireState;
+  private drag: {
+    selection: Selection;
+    ghost: HTMLElement;
+    offsetX: number;
+    offsetY: number;
+  } | null = null;
+  private boundOnMove: (e: PointerEvent) => void;
+  private boundOnUp: (e: PointerEvent) => void;
 
   constructor(state: SolitaireState) {
     this.state = state;
+    this.boundOnMove = this.onPointerMove.bind(this);
+    this.boundOnUp = this.onPointerUp.bind(this);
   }
 
   mount(container: HTMLElement): void {
@@ -145,10 +163,12 @@ export class SolitaireRenderer {
   }
 
   destroy(): void {
+    this.endDrag();
     this.container = null;
   }
 
   private restart(): void {
+    this.endDrag();
     this.state = createSolitaireGame();
     this.render();
   }
@@ -176,6 +196,7 @@ export class SolitaireRenderer {
 
     if (!this.state.selected) {
       this.state.selected = selection;
+      playSfx("click");
       this.render();
       return;
     }
@@ -234,122 +255,270 @@ export class SolitaireRenderer {
     }
   }
 
+  // ---- Drag support ----
+
+  private startDrag(e: PointerEvent, selection: Selection, el: HTMLElement): void {
+    if (this.state.won) return;
+    const cards = getSelectionCards(this.state, selection);
+    if (!cards.length || !cards[0].faceUp) return;
+
+    e.preventDefault();
+    const rect = el.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+
+    // Build ghost with selected cards stacked
+    const ghost = document.createElement("div");
+    ghost.style.position = "fixed";
+    ghost.style.left = `${rect.left}px`;
+    ghost.style.top = `${rect.top}px`;
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.pointerEvents = "none";
+    ghost.style.zIndex = "9999";
+    ghost.style.opacity = "0.92";
+
+    cards.forEach((card, i) => {
+      const cardEl = this.buildCardElement(card, false);
+      if (i > 0) {
+        cardEl.style.marginTop = "var(--card-overlap)";
+      }
+      ghost.appendChild(cardEl);
+    });
+
+    document.body.appendChild(ghost);
+    this.drag = { selection, ghost, offsetX, offsetY };
+    el.setPointerCapture(e.pointerId);
+
+    window.addEventListener("pointermove", this.boundOnMove);
+    window.addEventListener("pointerup", this.boundOnUp);
+  }
+
+  private onPointerMove(e: PointerEvent): void {
+    if (!this.drag) return;
+    e.preventDefault();
+    const { ghost, offsetX, offsetY } = this.drag;
+    ghost.style.left = `${e.clientX - offsetX}px`;
+    ghost.style.top = `${e.clientY - offsetY}px`;
+  }
+
+  private onPointerUp(e: PointerEvent): void {
+    if (!this.drag) return;
+    e.preventDefault();
+
+    const { selection } = this.drag;
+    const cards = getSelectionCards(this.state, selection);
+    const first = cards[0];
+
+    // Find drop target using elementFromPoint, ignoring ghost
+    this.drag.ghost.style.display = "none";
+    const targetEl = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    this.drag.ghost.style.display = "";
+
+    let moved = false;
+    if (targetEl) {
+      const tableauPile = targetEl.closest<HTMLElement>(".solitaire__pile");
+      const foundation = targetEl.closest<HTMLElement>(".solitaire__foundation");
+
+      if (tableauPile) {
+        const pileIndex = Number(tableauPile.dataset.pile);
+        const pile = this.state.tableau[pileIndex];
+        if (canStackOnTableau(first, pile[pile.length - 1])) {
+          const moving = removeSelectionCards(this.state, selection);
+          pile.push(...moving);
+          this.state.selected = null;
+          afterMove(this.state, selection);
+          moved = true;
+        }
+      } else if (foundation && cards.length === 1) {
+        const pileIndex = Number(foundation.dataset.pile);
+        const pile = this.state.foundations[pileIndex];
+        if (canMoveToFoundation(first, pile)) {
+          const moving = removeSelectionCards(this.state, selection);
+          pile.push(...moving);
+          this.state.selected = null;
+          afterMove(this.state, selection);
+          moved = true;
+        }
+      }
+    }
+
+    if (!moved) {
+      // Deselect if dropped nowhere valid
+      this.state.selected = null;
+    } else {
+      playSfx(this.state.won ? "success" : "hit");
+    }
+
+    this.endDrag();
+    this.render();
+  }
+
+  private endDrag(): void {
+    window.removeEventListener("pointermove", this.boundOnMove);
+    window.removeEventListener("pointerup", this.boundOnUp);
+    if (this.drag) {
+      this.drag.ghost.remove();
+      this.drag = null;
+    }
+  }
+
+  // ---- Rendering ----
+
   private render(): void {
     if (!this.container) return;
     submitScore(this.state);
 
-    this.container.innerHTML = `
-      <div class="solitaire">
-        <div class="puzzle-header">
-          <div>
-            <h1>Solitaire</h1>
-            <p>Build foundations from ace to king.</p>
-          </div>
-          <div class="puzzle-stats">
-            <span>Moves <strong>${this.state.moves}</strong></span>
-            <span>Best <strong>${this.state.bestMoves ? this.state.bestMoves : "-"}</strong></span>
-          </div>
-        </div>
-        <div class="solitaire__top">
-          <button class="card card--back" id="solitaire-stock">${this.state.stock.length || "Reset"}</button>
-          <button class="${this.getTopCardClass(this.state.waste[this.state.waste.length - 1])}" data-zone="waste">
-            ${this.renderCardFace(this.state.waste[this.state.waste.length - 1])}
-          </button>
-          <div class="solitaire__gap"></div>
-          ${this.state.foundations.map((pile, index) => {
-            const card = pile[pile.length - 1];
-            return `<button class="${this.getTopCardClass(card)}" data-zone="foundation" data-pile="${index}">${this.renderCardFace(card)}</button>`;
-          }).join("")}
-        </div>
-        <div class="solitaire__tableau">
-          ${this.state.tableau.map((pile, pileIndex) => this.renderPile(pile, pileIndex)).join("")}
-        </div>
-        <div class="puzzle-actions">
-          <button class="btn btn--secondary" id="solitaire-restart">New Game</button>
-          <a class="btn btn--secondary" href="#/">Back to Home</a>
-        </div>
-        ${this.state.won ? `<div class="puzzle-toast">Cleared in ${this.state.moves} moves.</div>` : ""}
+    const wrapper = document.createElement("div");
+    wrapper.className = "solitaire";
+
+    // Header
+    const header = document.createElement("div");
+    header.className = "puzzle-header";
+    header.innerHTML = `
+      <div>
+        <h1>Solitaire</h1>
+        <p>Build foundations ace to king.</p>
+      </div>
+      <div class="puzzle-stats">
+        <span>Moves <strong>${this.state.moves}</strong></span>
+        <span>Best <strong>${this.state.bestMoves ? this.state.bestMoves : "-"}</strong></span>
       </div>
     `;
+    wrapper.appendChild(header);
 
-    this.bindEvents();
-  }
+    // Top row
+    const top = document.createElement("div");
+    top.className = "solitaire__top";
 
-  private renderPile(pile: Card[], pileIndex: number): string {
-    const cards = pile.map((card, index) => this.renderCard(card, { zone: "tableau", pile: pileIndex, index })).join("");
-    return `<div class="solitaire__pile" data-zone="tableau" data-pile="${pileIndex}">${cards || `<button class="card solitaire__slot" data-empty="1"></button>`}</div>`;
-  }
+    // Stock
+    const stockBtn = document.createElement("button");
+    stockBtn.className = "card card--back solitaire__stock";
+    stockBtn.textContent = this.state.stock.length ? String(this.state.stock.length) : "↺";
+    stockBtn.addEventListener("click", () => this.drawStock());
+    top.appendChild(stockBtn);
 
-  private getTopCardClass(card?: Card): string {
-    if (!card) return "card solitaire__slot";
-    return `card ${isRed(card) ? "card--red" : "card--black"}`;
-  }
-
-  private renderCardFace(card?: Card): string {
-    if (!card) return "";
-    return `<span>${RANKS[card.rank]}</span><span>${card.suit}</span>`;
-  }
-
-  private renderCard(card?: Card, selection?: Selection): string {
-    if (!card) return "";
-    const selected = this.isSelected(selection) ? " card--selected" : "";
-    if (!card.faceUp) return `<button class="card card--back" data-zone="tableau" data-pile="${selection?.pile}" data-index="${selection?.index}"></button>`;
-    const red = isRed(card) ? " card--red" : " card--black";
-    const attrs = selection ? ` data-zone="${selection.zone}" data-pile="${selection.pile}" data-index="${selection.index}"` : "";
-    return `<button class="card${red}${selected}"${attrs}><span>${RANKS[card.rank]}</span><span>${card.suit}</span></button>`;
-  }
-
-  private isSelected(selection?: Selection): boolean {
-    const current = this.state.selected;
-    if (!current || !selection) return false;
-    return current.zone === selection.zone && current.pile === selection.pile && current.index === selection.index;
-  }
-
-  private bindEvents(): void {
-    if (!this.container) return;
-    this.container.querySelector("#solitaire-stock")?.addEventListener("click", () => this.drawStock());
-    this.container.querySelector("#solitaire-restart")?.addEventListener("click", () => this.restart());
-
-    const waste = this.container.querySelector<HTMLElement>("[data-zone='waste']");
-    waste?.addEventListener("click", () => this.select({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
-    waste?.addEventListener("dblclick", () => this.autoFoundation({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
-
-    this.container.querySelectorAll<HTMLElement>("[data-zone='foundation']").forEach((el) => {
-      el.addEventListener("click", () => this.tryTargetClick(el));
-    });
-    this.container.querySelectorAll<HTMLElement>(".solitaire__pile").forEach((el) => {
-      el.addEventListener("click", (event) => {
-        if (event.target === el) this.tryTargetClick(el);
-      });
-    });
-    this.container.querySelectorAll<HTMLElement>(".solitaire__tableau .card[data-index]").forEach((el) => {
-      el.addEventListener("click", (event) => {
-        event.stopPropagation();
-        this.select({
-          zone: "tableau",
-          pile: Number(el.dataset.pile),
-          index: Number(el.dataset.index),
-        });
-      });
-      el.addEventListener("dblclick", (event) => {
-        event.stopPropagation();
-        this.autoFoundation({
-          zone: "tableau",
-          pile: Number(el.dataset.pile),
-          index: Number(el.dataset.index),
-        });
-      });
-    });
-  }
-
-  private tryTargetClick(el: HTMLElement): void {
-    const zone = el.dataset.zone as Zone;
-    const pile = Number(el.dataset.pile);
-    const selection = { zone, pile, index: 0 };
-    if (this.state.selected && this.tryMove(selection)) {
-      if (this.state.won) vibrate([20, 20, 20, 20]);
-      playSfx(this.state.won ? "success" : "hit");
-      this.render();
+    // Waste
+    const wastePile = document.createElement("div");
+    wastePile.className = "solitaire__waste";
+    const wasteCard = this.state.waste[this.state.waste.length - 1];
+    if (wasteCard) {
+      const wEl = this.buildCardElement(wasteCard, this.isSelected({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
+      wEl.addEventListener("click", () => this.select({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
+      wEl.addEventListener("dblclick", () => this.autoFoundation({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
+      wEl.addEventListener("pointerdown", (e) => this.startDrag(e, { zone: "waste", pile: 0, index: this.state.waste.length - 1 }, wEl));
+      wastePile.appendChild(wEl);
+    } else {
+      const empty = document.createElement("div");
+      empty.className = "card solitaire__slot";
+      wastePile.appendChild(empty);
     }
+    top.appendChild(wastePile);
+
+    // Gap
+    const gap = document.createElement("div");
+    gap.className = "solitaire__gap";
+    top.appendChild(gap);
+
+    // Foundations
+    this.state.foundations.forEach((pile, index) => {
+      const fEl = document.createElement("div");
+      fEl.className = "solitaire__foundation";
+      fEl.dataset.pile = String(index);
+      const card = pile[pile.length - 1];
+      if (card) {
+        const cEl = this.buildCardElement(card, this.isSelected({ zone: "foundation", pile: index, index: pile.length - 1 }));
+        cEl.addEventListener("click", () => this.select({ zone: "foundation", pile: index, index: pile.length - 1 }));
+        cEl.addEventListener("pointerdown", (e) => this.startDrag(e, { zone: "foundation", pile: index, index: pile.length - 1 }, cEl));
+        fEl.appendChild(cEl);
+      } else {
+        const empty = document.createElement("div");
+        empty.className = "card solitaire__slot";
+        empty.innerHTML = `<span style="font-size:1.2rem;opacity:0.25">${SUIT_SYMBOLS[SUITS[index]]}</span>`;
+        fEl.appendChild(empty);
+      }
+      fEl.addEventListener("click", (e) => {
+        if (e.target === fEl) this.tryMove({ zone: "foundation", pile: index, index: pile.length });
+      });
+      top.appendChild(fEl);
+    });
+
+    wrapper.appendChild(top);
+
+    // Tableau
+    const tableau = document.createElement("div");
+    tableau.className = "solitaire__tableau";
+
+    this.state.tableau.forEach((pile, pileIndex) => {
+      const pileEl = document.createElement("div");
+      pileEl.className = "solitaire__pile";
+      pileEl.dataset.pile = String(pileIndex);
+
+      if (pile.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "card solitaire__slot";
+        pileEl.appendChild(empty);
+      } else {
+        pile.forEach((card, cardIndex) => {
+          const selected = this.isSelected({ zone: "tableau", pile: pileIndex, index: cardIndex });
+          const cEl = this.buildCardElement(card, selected);
+
+          cEl.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.select({ zone: "tableau", pile: pileIndex, index: cardIndex });
+          });
+          cEl.addEventListener("dblclick", (e) => {
+            e.stopPropagation();
+            this.autoFoundation({ zone: "tableau", pile: pileIndex, index: cardIndex });
+          });
+          cEl.addEventListener("pointerdown", (e) => {
+            this.startDrag(e, { zone: "tableau", pile: pileIndex, index: cardIndex }, cEl);
+          });
+
+          pileEl.appendChild(cEl);
+        });
+      }
+
+      pileEl.addEventListener("click", (e) => {
+        if (e.target === pileEl) this.tryMove({ zone: "tableau", pile: pileIndex, index: pile.length });
+      });
+
+      tableau.appendChild(pileEl);
+    });
+
+    wrapper.appendChild(tableau);
+
+    // Actions
+    const actions = document.createElement("div");
+    actions.className = "puzzle-actions";
+    actions.innerHTML = '<button class="btn btn--secondary" id="solitaire-restart">New Game</button><a class="btn btn--secondary" href="#/">Back to Home</a>';
+    actions.querySelector("#solitaire-restart")?.addEventListener("click", () => this.restart());
+    wrapper.appendChild(actions);
+
+    // Win toast
+    if (this.state.won) {
+      const toast = document.createElement("div");
+      toast.className = "puzzle-toast";
+      toast.textContent = `Cleared in ${this.state.moves} moves.`;
+      wrapper.appendChild(toast);
+    }
+
+    this.container.innerHTML = "";
+    this.container.appendChild(wrapper);
+  }
+
+  private buildCardElement(card: Card, selected: boolean): HTMLElement {
+    const el = document.createElement("button");
+    const red = isRed(card) ? " card--red" : " card--black";
+    el.className = `card${red}${selected ? " card--selected" : ""}${card.faceUp ? "" : " card--back"}`;
+    if (card.faceUp) {
+      el.innerHTML = `<span>${RANKS[card.rank]}</span><span>${SUIT_SYMBOLS[card.suit]}</span>`;
+    }
+    return el;
+  }
+
+  private isSelected(selection: Selection): boolean {
+    const current = this.state.selected;
+    if (!current) return false;
+    return current.zone === selection.zone && current.pile === selection.pile && current.index === selection.index;
   }
 }

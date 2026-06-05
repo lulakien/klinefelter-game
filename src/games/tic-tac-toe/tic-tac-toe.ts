@@ -5,7 +5,7 @@
  */
 
 import { playSfx, vibrate } from "../../app/audio-manager.js";
-import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
+import { saveScore } from "../../settings/scores-store.js";
 
 type Cell = "X" | "O" | "";
 type Difficulty = "easy" | "medium" | "hard";
@@ -20,13 +20,10 @@ interface TicTacToeState {
   mode: "pvp" | "ai";
   difficulty: Difficulty;
   scores: { x: number; o: number; draws: number };
-  bestStreak: number;
-  currentStreak: number;
   scoreSubmitted: boolean;
 }
 
 function createState(): TicTacToeState {
-  const pb = getPersonalBest("tic-tac-toe");
   return {
     board: Array.from({ length: 9 }, () => ""),
     currentPlayer: "X",
@@ -37,8 +34,6 @@ function createState(): TicTacToeState {
     mode: "pvp",
     difficulty: "medium",
     scores: { x: 0, o: 0, draws: 0 },
-    bestStreak: pb?.score ?? 0,
-    currentStreak: 0,
     scoreSubmitted: false,
   };
 }
@@ -167,11 +162,8 @@ export class TicTacToeRenderer {
       state.gameOver = true;
       if (state.winner === "X") {
         state.scores.x++;
-        state.currentStreak++;
-        state.bestStreak = Math.max(state.bestStreak, state.currentStreak);
       } else {
         state.scores.o++;
-        state.currentStreak = 0;
       }
       playSfx("success");
       vibrate([30, 50, 30]);
@@ -180,7 +172,6 @@ export class TicTacToeRenderer {
       state.draw = true;
       state.gameOver = true;
       state.scores.draws++;
-      state.currentStreak = 0;
       playSfx("fail");
       vibrate(40);
       this.saveScore();
@@ -195,8 +186,7 @@ export class TicTacToeRenderer {
     if (this.state.scoreSubmitted) return;
     this.state.scoreSubmitted = true;
     const total = this.state.scores.x + this.state.scores.o + this.state.scores.draws;
-    const score = this.state.bestStreak * 100 + total;
-    saveScore("tic-tac-toe", score, `${this.state.scores.x} wins`);
+    saveScore("tic-tac-toe", total, `${this.state.scores.x} wins`);
   }
 
   private reset(): void {
@@ -223,7 +213,7 @@ export class TicTacToeRenderer {
   private render(): void {
     if (!this.container) return;
 
-    const { board, currentPlayer, winner, draw, gameOver, mode, difficulty, scores, bestStreak, currentStreak } = this.state;
+    const { board, currentPlayer, winner, draw, gameOver, mode, difficulty, scores } = this.state;
 
     let statusText = `${currentPlayer}'s turn`;
     if (gameOver) {
@@ -245,7 +235,7 @@ export class TicTacToeRenderer {
           </div>
         </div>
 
-        <div class="tic-tac-toe__mode">
+        <div class="game-controls">
           <div class="toggle-group" id="ttt-mode-toggle">
             <button class="toggle-btn ${mode === "pvp" ? "toggle-btn--active" : ""}" data-value="pvp">2 Player</button>
             <button class="toggle-btn ${mode === "ai" ? "toggle-btn--active" : ""}" data-value="ai">vs AI</button>
@@ -269,11 +259,6 @@ export class TicTacToeRenderer {
               ${cell}
             </button>`;
           }).join("")}
-        </div>
-
-        <div class="tic-tac-toe__streak">
-          <span>Streak: ${currentStreak}</span>
-          <span>Best Streak: ${bestStreak}</span>
         </div>
 
         <div class="puzzle-actions">

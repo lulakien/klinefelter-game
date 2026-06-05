@@ -1,7 +1,14 @@
+/**
+ * Water Sort — pour colors between tubes until each is uniform.
+ *
+ * Tap a tube to select, tap another to pour.
+ * Warm toy-arcade design with animations.
+ */
+
 import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 
-type ColorId = 0 | 1 | 2 | 3 | 4 | 5;
+type ColorId = number;
 type Tube = ColorId[];
 
 interface WaterSortState {
@@ -12,22 +19,53 @@ interface WaterSortState {
   won: boolean;
   gameOver: boolean;
   scoreSubmitted: boolean;
+  difficulty: WaterSortDifficulty;
 }
 
-const CAPACITY = 4;
-const COLORS = ["#ff5b5b", "#23c7f4", "#ffd529", "#82de47", "#9b5cff", "#ff9f43"];
+export type WaterSortDifficulty = "easy" | "medium" | "hard";
 
-export function createWaterSortGame(): WaterSortState {
-  const solved: ColorId[] = [0, 1, 2, 3, 4, 5];
+const CAPACITY = 4;
+
+const COLORS = [
+  "#ff5b5b", "#23c7f4", "#ffd529", "#82de47",
+  "#9b5cff", "#ff9f43", "#ff6b9d", "#2ed1a2",
+];
+
+const DIFFICULTIES: Record<WaterSortDifficulty, { colors: number; empty: number; steps: number }> = {
+  easy: { colors: 4, empty: 2, steps: 30 },
+  medium: { colors: 6, empty: 2, steps: 50 },
+  hard: { colors: 8, empty: 2, steps: 70 },
+};
+
+function generatePuzzle(colors: number, empty: number, steps: number): Tube[] {
+  const tubes: Tube[] = [];
+  for (let c = 0; c < colors; c++) {
+    tubes.push(Array.from({ length: CAPACITY }, () => c as ColorId));
+  }
+  for (let e = 0; e < empty; e++) {
+    tubes.push([]);
+  }
+
+  for (let s = 0; s < steps; s++) {
+    const moves: { from: number; to: number }[] = [];
+    for (let i = 0; i < tubes.length; i++) {
+      for (let j = 0; j < tubes.length; j++) {
+        if (i !== j && canPour(tubes[i], tubes[j])) moves.push({ from: i, to: j });
+      }
+    }
+    if (moves.length === 0) break;
+    const move = moves[Math.floor(Math.random() * moves.length)];
+    pour(tubes, move.from, move.to);
+  }
+  return tubes;
+}
+
+export function createWaterSortGame(difficulty: WaterSortDifficulty = "medium"): WaterSortState {
+  const config = DIFFICULTIES[difficulty];
   let tubes: Tube[] = [];
 
   do {
-    const pieces = solved.flatMap((color) => Array.from({ length: CAPACITY }, () => color));
-    shuffle(pieces);
-    tubes = Array.from({ length: solved.length + 2 }, () => []);
-    for (let i = 0; i < pieces.length; i++) {
-      tubes[i % solved.length].push(pieces[i]);
-    }
+    tubes = generatePuzzle(config.colors, config.empty, config.steps);
   } while (isWon(tubes) || !hasAnyMove(tubes));
 
   return {
@@ -38,14 +76,8 @@ export function createWaterSortGame(): WaterSortState {
     won: false,
     gameOver: false,
     scoreSubmitted: false,
+    difficulty,
   };
-}
-
-function shuffle<T>(items: T[]): void {
-  for (let i = items.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [items[i], items[j]] = [items[j], items[i]];
-  }
 }
 
 function topRun(tube: Tube): { color: ColorId; count: number } | null {
@@ -101,6 +133,7 @@ function submitScore(state: WaterSortState): void {
 export class WaterSortRenderer {
   private container: HTMLElement | null = null;
   private state: WaterSortState;
+  private pouringTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(state: WaterSortState) {
     this.state = state;
@@ -112,41 +145,93 @@ export class WaterSortRenderer {
   }
 
   destroy(): void {
-    this.container = null;
+    if (this.pouringTimer) {
+      clearTimeout(this.pouringTimer);
+      this.pouringTimer = null;
+    }
+    if (this.container) {
+      this.container.innerHTML = "";
+    }
+  }
+
+  private setDifficulty(difficulty: WaterSortDifficulty): void {
+    this.state.difficulty = difficulty;
+    this.restart();
   }
 
   private selectTube(index: number): void {
-    if (this.state.won) return;
+    if (this.state.won || this.state.gameOver) return;
 
     if (this.state.selectedTube === null) {
-      if (this.state.tubes[index]?.length) this.state.selectedTube = index;
-      this.render();
+      if (this.state.tubes[index]?.length) {
+        this.state.selectedTube = index;
+        playSfx("click");
+        this.render();
+      }
       return;
     }
 
     const from = this.state.selectedTube;
-    const moved = pour(this.state.tubes, from, index);
     this.state.selectedTube = null;
 
-    if (moved) {
-      this.state.moves++;
-      this.state.won = isWon(this.state.tubes);
-      if (!this.state.won) {
-        this.state.gameOver = !hasAnyMove(this.state.tubes);
-      }
-      if (this.state.won && (!this.state.bestMoves || this.state.moves < this.state.bestMoves)) {
-        this.state.bestMoves = this.state.moves;
-      }
-      playSfx(this.state.won ? "success" : "hit");
-      if (this.state.won) vibrate([20, 30, 20]);
-    } else {
-      playSfx("fail");
+    if (from === index) {
+      this.render();
+      return;
     }
-    this.render();
+
+    // Animate pour then apply state
+    this.animatePour(from, index, () => {
+      const moved = pour(this.state.tubes, from, index);
+      if (moved) {
+        this.state.moves++;
+        this.state.won = isWon(this.state.tubes);
+        if (!this.state.won) {
+          this.state.gameOver = !hasAnyMove(this.state.tubes);
+        }
+        if (this.state.won && (!this.state.bestMoves || this.state.moves < this.state.bestMoves)) {
+          this.state.bestMoves = this.state.moves;
+        }
+        playSfx(this.state.won ? "success" : "hit");
+        if (this.state.won) vibrate([20, 30, 20]);
+      } else {
+        playSfx("fail");
+      }
+      this.render();
+    });
+  }
+
+  private animatePour(fromIndex: number, toIndex: number, onComplete: () => void): void {
+    if (!this.container) {
+      onComplete();
+      return;
+    }
+    const rack = this.container.querySelector(".water-sort__rack");
+    if (!rack) {
+      onComplete();
+      return;
+    }
+    const fromTube = rack.children[fromIndex] as HTMLElement;
+    const toTube = rack.children[toIndex] as HTMLElement;
+    if (!fromTube || !toTube) {
+      onComplete();
+      return;
+    }
+
+    fromTube.classList.add("water-sort__tube--pouring");
+    toTube.classList.add("water-sort__tube--receiving");
+
+    this.pouringTimer = setTimeout(() => {
+      this.pouringTimer = null;
+      onComplete();
+    }, 220);
   }
 
   private restart(): void {
-    this.state = createWaterSortGame();
+    if (this.pouringTimer) {
+      clearTimeout(this.pouringTimer);
+      this.pouringTimer = null;
+    }
+    this.state = createWaterSortGame(this.state.difficulty);
     this.render();
   }
 
@@ -154,43 +239,100 @@ export class WaterSortRenderer {
     if (!this.container) return;
     submitScore(this.state);
 
-    this.container.innerHTML = `
-      <div class="water-sort">
-        <div class="puzzle-header">
-          <div>
-            <h1>Water Sort</h1>
-            <p>Pour matching colors until every tube is pure.</p>
-          </div>
-          <div class="puzzle-stats">
-            <span>Moves <strong>${this.state.moves}</strong></span>
-            <span>Best <strong>${this.state.bestMoves ? this.state.bestMoves : "-"}</strong></span>
-          </div>
-        </div>
-        <div class="water-sort__rack">
-          ${this.state.tubes.map((tube, index) => this.renderTube(tube, index)).join("")}
-        </div>
-        <div class="puzzle-actions">
-          <button class="btn btn--secondary" id="water-restart">New Game</button>
-          <a class="btn btn--secondary" href="#/">Back to Home</a>
-        </div>
-        ${this.state.won ? `<div class="puzzle-toast">Sorted in ${this.state.moves} moves.</div>` : ""}
-        ${this.state.gameOver ? `<div class="puzzle-toast puzzle-toast--lose">No more moves.</div>` : ""}
+    const wrapper = document.createElement("div");
+    wrapper.className = "water-sort";
+
+    // Header
+    const header = document.createElement("div");
+    header.className = "puzzle-header";
+    header.innerHTML = `
+      <div>
+        <h1>Water Sort</h1>
+        <p>Pour matching colors until every tube is pure.</p>
+      </div>
+      <div class="puzzle-stats">
+        <span>Moves <strong>${this.state.moves}</strong></span>
+        <span>Best <strong>${this.state.bestMoves ? this.state.bestMoves : "-"}</strong></span>
       </div>
     `;
+    wrapper.appendChild(header);
 
-    this.container.querySelectorAll<HTMLElement>("[data-tube]").forEach((tube) => {
-      tube.addEventListener("click", () => this.selectTube(Number(tube.dataset.tube)));
+    // Difficulty
+    const controls = document.createElement("div");
+    controls.className = "game-controls";
+    controls.innerHTML = `
+      <div class="toggle-group" id="ws-diff-toggle">
+        <button class="toggle-btn ${this.state.difficulty === "easy" ? "toggle-btn--active" : ""}" data-value="easy">Easy</button>
+        <button class="toggle-btn ${this.state.difficulty === "medium" ? "toggle-btn--active" : ""}" data-value="medium">Medium</button>
+        <button class="toggle-btn ${this.state.difficulty === "hard" ? "toggle-btn--active" : ""}" data-value="hard">Hard</button>
+      </div>
+    `;
+    wrapper.appendChild(controls);
+
+    // Rack
+    const rack = document.createElement("div");
+    rack.className = "water-sort__rack";
+    const cols = this.state.tubes.length <= 6 ? 3 : 4;
+    rack.style.gridTemplateColumns = `repeat(${cols}, minmax(60px, 1fr))`;
+
+    this.state.tubes.forEach((tube, index) => {
+      const selected = this.state.selectedTube === index ? " water-sort__tube--selected" : "";
+      const complete = tube.length === CAPACITY && tube.every((c) => c === tube[0]) ? " water-sort__tube--complete" : "";
+      const btn = document.createElement("button");
+      btn.className = `water-sort__tube${selected}${complete}`;
+      btn.dataset.tube = String(index);
+      btn.setAttribute("aria-label", `Tube ${index + 1}`);
+      btn.addEventListener("click", () => this.selectTube(index));
+
+      for (let slot = 0; slot < CAPACITY; slot++) {
+        const color = tube[CAPACITY - 1 - slot];
+        const liquid = document.createElement("span");
+        liquid.className = "water-sort__liquid";
+        if (color !== undefined) {
+          liquid.style.background = COLORS[color];
+        } else {
+          liquid.style.opacity = "0";
+        }
+        btn.appendChild(liquid);
+      }
+      rack.appendChild(btn);
     });
-    this.container.querySelector("#water-restart")?.addEventListener("click", () => this.restart());
-  }
 
-  private renderTube(tube: Tube, index: number): string {
-    const selected = this.state.selectedTube === index ? " water-sort__tube--selected" : "";
-    const cells = Array.from({ length: CAPACITY }, (_, slot) => {
-      const color = tube[CAPACITY - 1 - slot];
-      const style = color === undefined ? "" : ` style="background:${COLORS[color]}"`;
-      return `<span class="water-sort__liquid"${style}></span>`;
-    }).join("");
-    return `<button class="water-sort__tube${selected}" data-tube="${index}" aria-label="Tube ${index + 1}">${cells}</button>`;
+    wrapper.appendChild(rack);
+
+    // Actions
+    const actions = document.createElement("div");
+    actions.className = "puzzle-actions";
+    actions.innerHTML = '<button class="btn btn--secondary" id="water-restart">New Game</button><a class="btn btn--secondary" href="#/">Back to Home</a>';
+    actions.querySelector("#water-restart")?.addEventListener("click", () => this.restart());
+    wrapper.appendChild(actions);
+
+    // Toasts
+    if (this.state.won) {
+      const toast = document.createElement("div");
+      toast.className = "puzzle-toast";
+      toast.textContent = `Sorted in ${this.state.moves} moves.`;
+      wrapper.appendChild(toast);
+    }
+    if (this.state.gameOver) {
+      const toast = document.createElement("div");
+      toast.className = "puzzle-toast puzzle-toast--lose";
+      toast.textContent = "No more moves.";
+      wrapper.appendChild(toast);
+    }
+
+    this.container.innerHTML = "";
+    this.container.appendChild(wrapper);
+
+    // Bind difficulty
+    const diffToggle = wrapper.querySelector("#ws-diff-toggle");
+    diffToggle?.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest(".toggle-btn");
+      if (!btn) return;
+      const value = btn.getAttribute("data-value") as WaterSortDifficulty;
+      if (value && value !== this.state.difficulty) {
+        this.setDifficulty(value);
+      }
+    });
   }
 }

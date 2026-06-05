@@ -5,7 +5,7 @@
  */
 
 import { playSfx, vibrate } from "../../app/audio-manager.js";
-import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
+import { saveScore } from "../../settings/scores-store.js";
 
 type Player = 1 | 2;
 type Cell = 0 | 1 | 2;
@@ -20,8 +20,6 @@ interface ConnectFourState {
   mode: "pvp" | "ai";
   difficulty: Difficulty;
   scores: { p1: number; p2: number; draws: number };
-  bestStreak: number;
-  currentStreak: number;
   scoreSubmitted: boolean;
   winningLine: [number, number][];
 }
@@ -30,7 +28,6 @@ const ROWS = 6;
 const COLS = 7;
 
 function createState(): ConnectFourState {
-  const pb = getPersonalBest("connect-four");
   return {
     board: Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => 0 as Cell)),
     currentPlayer: 1,
@@ -40,8 +37,6 @@ function createState(): ConnectFourState {
     mode: "pvp",
     difficulty: "medium",
     scores: { p1: 0, p2: 0, draws: 0 },
-    bestStreak: pb?.score ?? 0,
-    currentStreak: 0,
     scoreSubmitted: false,
     winningLine: [],
   };
@@ -268,11 +263,8 @@ export class ConnectFourRenderer {
       state.gameOver = true;
       if (result.winner === 1) {
         state.scores.p1++;
-        state.currentStreak++;
-        state.bestStreak = Math.max(state.bestStreak, state.currentStreak);
       } else {
         state.scores.p2++;
-        state.currentStreak = 0;
       }
       playSfx("success");
       vibrate([25, 30, 25]);
@@ -281,7 +273,6 @@ export class ConnectFourRenderer {
       state.draw = true;
       state.gameOver = true;
       state.scores.draws++;
-      state.currentStreak = 0;
       playSfx("fail");
       vibrate(40);
       this.saveScore();
@@ -296,8 +287,7 @@ export class ConnectFourRenderer {
     if (this.state.scoreSubmitted) return;
     this.state.scoreSubmitted = true;
     const total = this.state.scores.p1 + this.state.scores.p2 + this.state.scores.draws;
-    const score = this.state.bestStreak * 100 + total;
-    saveScore("connect-four", score, `${this.state.scores.p1} wins`);
+    saveScore("connect-four", total, `${this.state.scores.p1} wins`);
   }
 
   private reset(): void {
@@ -324,7 +314,7 @@ export class ConnectFourRenderer {
   private render(): void {
     if (!this.container) return;
 
-    const { board, currentPlayer, winner, draw, gameOver, mode, difficulty, scores, bestStreak, currentStreak, winningLine } = this.state;
+    const { board, currentPlayer, winner, draw, gameOver, mode, difficulty, scores, winningLine } = this.state;
 
     let statusText = `Player ${currentPlayer}'s turn`;
     if (gameOver) {
@@ -349,7 +339,7 @@ export class ConnectFourRenderer {
           </div>
         </div>
 
-        <div class="connect-four__mode">
+        <div class="game-controls">
           <div class="toggle-group" id="cf-mode-toggle">
             <button class="toggle-btn ${mode === "pvp" ? "toggle-btn--active" : ""}" data-value="pvp">2 Player</button>
             <button class="toggle-btn ${mode === "ai" ? "toggle-btn--active" : ""}" data-value="ai">vs AI</button>
@@ -384,11 +374,6 @@ export class ConnectFourRenderer {
               Drop
             </button>
           `).join("")}
-        </div>
-
-        <div class="connect-four__streak">
-          <span>Streak: ${currentStreak}</span>
-          <span>Best Streak: ${bestStreak}</span>
         </div>
 
         <div class="puzzle-actions">

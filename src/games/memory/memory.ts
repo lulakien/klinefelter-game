@@ -10,9 +10,15 @@ import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 
 // ---- Constants ----
 
-const PAIRS = 8;
-const CARDS = PAIRS * 2;
-const SYMBOLS = ["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼"];
+const SYMBOL_POOL = ["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🐔"];
+
+export type MemoryDifficulty = "easy" | "medium" | "hard";
+
+const DIFFICULTIES: Record<MemoryDifficulty, { pairs: number; cols: number }> = {
+  easy: { pairs: 4, cols: 4 },
+  medium: { pairs: 8, cols: 4 },
+  hard: { pairs: 12, cols: 4 },
+};
 
 // ---- Types ----
 
@@ -28,19 +34,22 @@ interface MemoryState {
   secondPick: number | null;
   moves: number;
   bestMoves: number;
-  locked: boolean; // prevent clicks during mismatch reveal
+  locked: boolean;
   won: boolean;
   scoreSubmitted: boolean;
+  difficulty: MemoryDifficulty;
 }
 
 // ---- Game Logic ----
 
-export function createMemoryGame(): MemoryState {
-  const symbols = [...SYMBOLS, ...SYMBOLS];
-  shuffle(symbols);
+export function createMemoryGame(difficulty: MemoryDifficulty = "medium"): MemoryState {
+  const config = DIFFICULTIES[difficulty];
+  const symbols = SYMBOL_POOL.slice(0, config.pairs);
+  const deck = [...symbols, ...symbols];
+  shuffle(deck);
 
   return {
-    cards: symbols.map((s) => ({ symbol: s, flipped: false, matched: false })),
+    cards: deck.map((s) => ({ symbol: s, flipped: false, matched: false })),
     firstPick: null,
     secondPick: null,
     moves: 0,
@@ -48,6 +57,7 @@ export function createMemoryGame(): MemoryState {
     locked: false,
     won: false,
     scoreSubmitted: false,
+    difficulty,
   };
 }
 
@@ -63,8 +73,6 @@ function shuffle<T>(arr: T[]): void {
 export class MemoryRenderer {
   private state: MemoryState;
   private container: HTMLElement | null = null;
-  private movesEl: HTMLElement | null = null;
-  private bestEl: HTMLElement | null = null;
   private flipTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(state: MemoryState) {
@@ -73,56 +81,7 @@ export class MemoryRenderer {
 
   mount(container: HTMLElement): void {
     this.container = container;
-    container.innerHTML = "";
-
-    const wrapper = document.createElement("div");
-    wrapper.className = "memory";
-
-    // Header
-    const header = document.createElement("div");
-    header.className = "puzzle-header";
-    header.innerHTML = `
-      <div>
-        <h1>Memory</h1>
-        <p>Match all the pairs</p>
-      </div>
-      <div class="puzzle-stats">
-        <span>MOVES <strong id="mem-moves">0</strong></span>
-        <span>BEST <strong id="mem-best">${this.state.bestMoves || "—"}</strong></span>
-      </div>
-    `;
-    wrapper.appendChild(header);
-
-    // Grid
-    const grid = document.createElement("div");
-    grid.className = "memory__grid";
-
-    for (let i = 0; i < CARDS; i++) {
-      const card = this.state.cards[i];
-      const cell = document.createElement("button");
-      cell.className = "memory__card";
-      if (card.flipped || card.matched) cell.classList.add("memory__card--flipped");
-      if (card.matched) cell.classList.add("memory__card--matched");
-      cell.innerHTML = `<span class="memory__face">${card.symbol}</span>`;
-      cell.addEventListener("click", () => this.handlePick(i));
-      grid.appendChild(cell);
-    }
-
-    wrapper.appendChild(grid);
-
-    // Actions
-    const actions = document.createElement("div");
-    actions.className = "puzzle-actions";
-    actions.innerHTML = '<button class="btn btn--secondary" id="mem-restart">Restart</button><a class="btn btn--secondary" href="#/">Back to Home</a>';
-    const restartBtn = actions.querySelector("#mem-restart")!;
-    restartBtn.addEventListener("click", () => this.reset());
-
-    wrapper.appendChild(actions);
-    container.appendChild(wrapper);
-
-    // Cache refs
-    this.movesEl = this.container?.querySelector("#mem-moves") ?? null;
-    this.bestEl = this.container?.querySelector("#mem-best") ?? null;
+    this.render();
   }
 
   destroy(): void {
@@ -135,18 +94,25 @@ export class MemoryRenderer {
     }
   }
 
+  private setDifficulty(difficulty: MemoryDifficulty): void {
+    this.state.difficulty = difficulty;
+    this.reset();
+  }
+
   private handlePick(index: number): void {
     const before = this.state.moves;
     this.pickCard(index);
     this.updateAllCards(this.state);
 
-    if (this.state.moves !== before && this.movesEl) {
-      this.movesEl.textContent = String(this.state.moves);
+    const movesEl = this.container?.querySelector("#mem-moves");
+    if (movesEl && this.state.moves !== before) {
+      movesEl.textContent = String(this.state.moves);
     }
 
     if (this.state.won) {
-      if (this.bestEl) {
-        this.bestEl.textContent = String(this.state.bestMoves);
+      const bestEl = this.container?.querySelector("#mem-best");
+      if (bestEl) {
+        bestEl.textContent = String(this.state.bestMoves || "—");
       }
       this.showWin();
     }
@@ -160,7 +126,7 @@ export class MemoryRenderer {
       <div>
         <h2>You Win!</h2>
         <p>${this.state.moves} moves</p>
-        ${this.state.moves < this.state.bestMoves ? "<p class='memory__new-best'>New Best!</p>" : ""}
+        ${this.state.moves <= this.state.bestMoves ? "<p class='memory__new-best'>New Best!</p>" : ""}
         <button class="btn btn--primary" id="mem-play-again">Play Again</button>
         <a class="btn btn--secondary" href="#/">Back to Home</a>
       </div>
@@ -174,26 +140,13 @@ export class MemoryRenderer {
   }
 
   private reset(): void {
-    const fresh = createMemoryGame();
-    this.state.cards = fresh.cards;
-    this.state.firstPick = null;
-    this.state.secondPick = null;
-    this.state.moves = 0;
-    this.state.bestMoves = Math.max(this.state.bestMoves, fresh.bestMoves);
-    this.state.locked = false;
-    this.state.won = false;
-    this.state.scoreSubmitted = false;
-
-    if (this.movesEl) this.movesEl.textContent = "0";
-    if (this.bestEl) this.bestEl.textContent = String(this.state.bestMoves || "—");
-
-    // Remove win overlay
-    const overlay = this.container?.querySelector(".memory__win");
-    if (overlay) overlay.remove();
-
-    this.updateAllCards(this.state);
+    if (this.flipTimeout) {
+      clearTimeout(this.flipTimeout);
+      this.flipTimeout = null;
+    }
+    this.state = createMemoryGame(this.state.difficulty);
+    this.render();
   }
-
 
   private pickCard(index: number): void {
     const state = this.state;
@@ -217,7 +170,6 @@ export class MemoryRenderer {
     const second = state.cards[state.secondPick];
 
     if (first.symbol === second.symbol) {
-      // Match!
       first.matched = true;
       second.matched = true;
       playSfx("success");
@@ -231,7 +183,6 @@ export class MemoryRenderer {
         this.endGame();
       }
     } else {
-      // Mismatch — flip back after delay
       const a = state.firstPick;
       const b = state.secondPick;
       this.flipTimeout = setTimeout(() => {
@@ -255,7 +206,7 @@ export class MemoryRenderer {
       saveScore("memory", state.moves, `${state.moves} moves`);
     }
   }
-  /** Sync DOM cards with state — call after delayed flip-back. */
+
   private updateAllCards(state: MemoryState): void {
     if (!this.container) return;
     const cells = this.container.querySelectorAll(".memory__card");
@@ -263,6 +214,82 @@ export class MemoryRenderer {
       const card = state.cards[i];
       cell.classList.toggle("memory__card--flipped", card.flipped || card.matched);
       cell.classList.toggle("memory__card--matched", card.matched);
+    });
+  }
+
+  private render(): void {
+    if (!this.container) return;
+    this.container.innerHTML = "";
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "memory";
+
+    const config = DIFFICULTIES[this.state.difficulty];
+
+    // Header
+    const header = document.createElement("div");
+    header.className = "puzzle-header";
+    header.innerHTML = `
+      <div>
+        <h1>Memory</h1>
+        <p>Match all the pairs</p>
+      </div>
+      <div class="puzzle-stats">
+        <span>MOVES <strong id="mem-moves">0</strong></span>
+        <span>BEST <strong id="mem-best">${this.state.bestMoves || "—"}</strong></span>
+      </div>
+    `;
+    wrapper.appendChild(header);
+
+    // Difficulty selector
+    const controls = document.createElement("div");
+    controls.className = "game-controls";
+    controls.innerHTML = `
+      <div class="toggle-group" id="mem-diff-toggle">
+        <button class="toggle-btn ${this.state.difficulty === "easy" ? "toggle-btn--active" : ""}" data-value="easy">Easy</button>
+        <button class="toggle-btn ${this.state.difficulty === "medium" ? "toggle-btn--active" : ""}" data-value="medium">Medium</button>
+        <button class="toggle-btn ${this.state.difficulty === "hard" ? "toggle-btn--active" : ""}" data-value="hard">Hard</button>
+      </div>
+    `;
+    wrapper.appendChild(controls);
+
+    // Grid
+    const grid = document.createElement("div");
+    grid.className = "memory__grid";
+    grid.style.gridTemplateColumns = `repeat(${config.cols}, 1fr)`;
+
+    for (let i = 0; i < this.state.cards.length; i++) {
+      const card = this.state.cards[i];
+      const cell = document.createElement("button");
+      cell.className = "memory__card";
+      if (card.flipped || card.matched) cell.classList.add("memory__card--flipped");
+      if (card.matched) cell.classList.add("memory__card--matched");
+      cell.innerHTML = `<span class="memory__face">${card.symbol}</span>`;
+      cell.addEventListener("click", () => this.handlePick(i));
+      grid.appendChild(cell);
+    }
+
+    wrapper.appendChild(grid);
+
+    // Actions
+    const actions = document.createElement("div");
+    actions.className = "puzzle-actions";
+    actions.innerHTML = '<button class="btn btn--secondary" id="mem-restart">Restart</button><a class="btn btn--secondary" href="#/">Back to Home</a>';
+    const restartBtn = actions.querySelector("#mem-restart")!;
+    restartBtn.addEventListener("click", () => this.reset());
+
+    wrapper.appendChild(actions);
+    this.container.appendChild(wrapper);
+
+    // Bind difficulty toggle
+    const diffToggle = wrapper.querySelector("#mem-diff-toggle");
+    diffToggle?.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest(".toggle-btn");
+      if (!btn) return;
+      const value = btn.getAttribute("data-value") as MemoryDifficulty;
+      if (value && value !== this.state.difficulty) {
+        this.setDifficulty(value);
+      }
     });
   }
 }

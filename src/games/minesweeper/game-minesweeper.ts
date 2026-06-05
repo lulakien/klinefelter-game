@@ -419,8 +419,18 @@ export class MinesweeperRenderer {
     let smiley = "🙂";
     if (gameOver) smiley = won ? "😎" : "💀";
 
+    const diff = this.state.difficulty;
+
     this.container.innerHTML = `
       <div class="minesweeper">
+        <div class="minesweeper__difficulty">
+          <div class="toggle-group" id="ms-diff-toggle">
+            <button class="toggle-btn ${diff === "beginner" ? "toggle-btn--active" : ""}" data-value="beginner">Easy</button>
+            <button class="toggle-btn ${diff === "intermediate" ? "toggle-btn--active" : ""}" data-value="intermediate">Medium</button>
+            <button class="toggle-btn ${diff === "expert" ? "toggle-btn--active" : ""}" data-value="expert">Hard</button>
+          </div>
+        </div>
+
         <div class="minesweeper__header">
           <div class="minesweeper__counter">💣 ${remaining}</div>
           <button class="minesweeper__smiley" id="btn-smiley">${smiley}</button>

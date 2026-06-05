@@ -1,3 +1,10 @@
+/**
+ * Block Blast — place block shapes on an 8×8 board.
+ *
+ * Drag shapes from the tray onto the board.
+ * Full rows or columns clear for bonus points.
+ */
+
 import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
 
@@ -11,7 +18,6 @@ interface Shape {
 interface BlockBlastState {
   grid: (string | null)[][];
   shapes: Shape[];
-  selectedShape: number | null;
   score: number;
   bestScore: number;
   gameOver: boolean;
@@ -45,7 +51,6 @@ export function createBlockBlastGame(): BlockBlastState {
   const state: BlockBlastState = {
     grid: Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => null)),
     shapes: drawShapes(),
-    selectedShape: null,
     score: 0,
     bestScore: getPersonalBest("block-blast")?.score ?? 0,
     gameOver: false,
@@ -96,7 +101,6 @@ function placeShape(state: BlockBlastState, shapeIndex: number, row: number, col
 
   if (state.shapes.every((item) => item.used)) {
     state.shapes = drawShapes();
-    state.selectedShape = null;
   }
 
   state.bestScore = Math.max(state.bestScore, state.score);
@@ -143,12 +147,24 @@ function submitScore(state: BlockBlastState): void {
   state.scoreSubmitted = true;
 }
 
+interface DragState {
+  shapeIndex: number;
+  ghost: HTMLElement;
+  offsetX: number;
+  offsetY: number;
+}
+
 export class BlockBlastRenderer {
   private container: HTMLElement | null = null;
   private state: BlockBlastState;
+  private drag: DragState | null = null;
+  private boundOnMove: (e: PointerEvent) => void;
+  private boundOnUp: (e: PointerEvent) => void;
 
   constructor(state: BlockBlastState) {
     this.state = state;
+    this.boundOnMove = this.onPointerMove.bind(this);
+    this.boundOnUp = this.onPointerUp.bind(this);
   }
 
   mount(container: HTMLElement): void {
@@ -157,28 +173,13 @@ export class BlockBlastRenderer {
   }
 
   destroy(): void {
+    this.endDrag();
     this.container = null;
   }
 
   private restart(): void {
+    this.endDrag();
     this.state = createBlockBlastGame();
-    this.render();
-  }
-
-  private selectShape(index: number): void {
-    if (this.state.shapes[index]?.used) return;
-    this.state.selectedShape = index;
-    this.render();
-  }
-
-  private clickCell(row: number, col: number): void {
-    if (this.state.selectedShape === null || this.state.gameOver) return;
-    const moved = placeShape(this.state, this.state.selectedShape, row, col);
-    if (moved) {
-      playSfx(this.state.gameOver ? "fail" : "hit");
-    } else {
-      playSfx("fail");
-    }
     this.render();
   }
 
@@ -191,15 +192,15 @@ export class BlockBlastRenderer {
         <div class="puzzle-header">
           <div>
             <h1>Block Blast</h1>
-            <p>Place all three blocks. Full rows or columns clear.</p>
+            <p>Drag blocks from the tray onto the board.</p>
           </div>
           <div class="puzzle-stats">
             <span>Score <strong>${this.state.score}</strong></span>
             <span>Best <strong>${this.state.bestScore}</strong></span>
           </div>
         </div>
-        <div class="block-blast__board">${this.renderGrid()}</div>
-        <div class="block-blast__tray">${this.state.shapes.map((shape, index) => this.renderShape(shape, index)).join("")}</div>
+        <div class="block-blast__board" id="bb-board">${this.renderGrid()}</div>
+        <div class="block-blast__tray" id="bb-tray">${this.state.shapes.map((shape, index) => this.renderShape(shape, index)).join("")}</div>
         <div class="puzzle-actions">
           <button class="btn btn--secondary" id="block-restart">New Game</button>
           <a class="btn btn--secondary" href="#/">Back to Home</a>
@@ -208,11 +209,8 @@ export class BlockBlastRenderer {
       </div>
     `;
 
-    this.container.querySelectorAll<HTMLElement>("[data-shape]").forEach((shape) => {
-      shape.addEventListener("click", () => this.selectShape(Number(shape.dataset.shape)));
-    });
-    this.container.querySelectorAll<HTMLElement>("[data-cell]").forEach((cell) => {
-      cell.addEventListener("click", () => this.clickCell(Number(cell.dataset.row), Number(cell.dataset.col)));
+    this.container.querySelectorAll<HTMLElement>("[data-shape]").forEach((shapeEl) => {
+      shapeEl.addEventListener("pointerdown", (e) => this.onShapePointerDown(e, Number(shapeEl.dataset.shape)));
     });
     this.container.querySelector("#block-restart")?.addEventListener("click", () => this.restart());
   }
@@ -223,14 +221,13 @@ export class BlockBlastRenderer {
       for (let c = 0; c < SIZE; c++) {
         const color = this.state.grid[r][c];
         const style = color ? ` style="background:${color}"` : "";
-        html += `<button class="block-blast__cell" data-cell="1" data-row="${r}" data-col="${c}"${style}></button>`;
+        html += `<div class="block-blast__cell" data-row="${r}" data-col="${c}"${style}></div>`;
       }
     }
     return html;
   }
 
   private renderShape(shape: Shape, index: number): string {
-    const selected = this.state.selectedShape === index ? " block-blast__shape--selected" : "";
     const used = shape.used ? " block-blast__shape--used" : "";
     const maxRow = Math.max(...shape.cells.map(([r]) => r));
     const maxCol = Math.max(...shape.cells.map(([, c]) => c));
@@ -243,9 +240,129 @@ export class BlockBlastRenderer {
       }
     }
     return `
-      <button class="block-blast__shape${selected}${used}" data-shape="${index}" style="grid-template-columns:repeat(${maxCol + 1},18px)">
+      <div class="block-blast__shape${used}" data-shape="${index}" style="grid-template-columns:repeat(${maxCol + 1},18px)">
         ${grid}
-      </button>
+      </div>
     `;
+  }
+
+  private onShapePointerDown(e: PointerEvent, shapeIndex: number): void {
+    if (this.state.gameOver) return;
+    const shape = this.state.shapes[shapeIndex];
+    if (!shape || shape.used) return;
+
+    e.preventDefault();
+    const el = e.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+
+    // Create ghost
+    const ghost = el.cloneNode(true) as HTMLElement;
+    ghost.style.position = "fixed";
+    ghost.style.left = `${rect.left}px`;
+    ghost.style.top = `${rect.top}px`;
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.height = `${rect.height}px`;
+    ghost.style.pointerEvents = "none";
+    ghost.style.zIndex = "9999";
+    ghost.style.opacity = "0.85";
+    ghost.style.transform = "scale(1.1)";
+    ghost.style.transition = "none";
+    ghost.classList.remove("block-blast__shape--used");
+    document.body.appendChild(ghost);
+
+    this.drag = { shapeIndex, ghost, offsetX, offsetY };
+    el.setPointerCapture(e.pointerId);
+
+    window.addEventListener("pointermove", this.boundOnMove);
+    window.addEventListener("pointerup", this.boundOnUp);
+  }
+
+  private onPointerMove(e: PointerEvent): void {
+    if (!this.drag) return;
+    e.preventDefault();
+
+    const { ghost, offsetX, offsetY } = this.drag;
+    ghost.style.left = `${e.clientX - offsetX}px`;
+    ghost.style.top = `${e.clientY - offsetY}px`;
+
+    this.updateBoardPreview(e.clientX, e.clientY);
+  }
+
+  private onPointerUp(e: PointerEvent): void {
+    if (!this.drag) return;
+    e.preventDefault();
+
+    const { shapeIndex } = this.drag;
+    const board = this.container?.querySelector("#bb-board") as HTMLElement | null;
+    let placed = false;
+
+    if (board) {
+      const boardRect = board.getBoundingClientRect();
+      const cellSize = boardRect.width / SIZE;
+      const col = Math.floor((e.clientX - boardRect.left) / cellSize);
+      const row = Math.floor((e.clientY - boardRect.top) / cellSize);
+      if (placeShape(this.state, shapeIndex, row, col)) {
+        placed = true;
+        playSfx(this.state.gameOver ? "fail" : "hit");
+      }
+    }
+
+    if (!placed) {
+      playSfx("fail");
+    }
+
+    this.endDrag();
+    this.render();
+  }
+
+  private endDrag(): void {
+    window.removeEventListener("pointermove", this.boundOnMove);
+    window.removeEventListener("pointerup", this.boundOnUp);
+    if (this.drag) {
+      this.drag.ghost.remove();
+      this.drag = null;
+    }
+    this.clearBoardPreview();
+  }
+
+  private updateBoardPreview(clientX: number, clientY: number): void {
+    this.clearBoardPreview();
+    if (!this.drag) return;
+
+    const board = this.container?.querySelector("#bb-board") as HTMLElement | null;
+    if (!board) return;
+
+    const boardRect = board.getBoundingClientRect();
+    const cellSize = boardRect.width / SIZE;
+    const col = Math.floor((clientX - boardRect.left) / cellSize);
+    const row = Math.floor((clientY - boardRect.top) / cellSize);
+
+    const shape = this.state.shapes[this.drag.shapeIndex];
+    const valid = canPlace(this.state, shape, row, col);
+
+    for (const [r, c] of shape.cells) {
+      const targetRow = row + r;
+      const targetCol = col + c;
+      const cell = board.querySelector(`[data-row="${targetRow}"][data-col="${targetCol}"]`) as HTMLElement | null;
+      if (cell) {
+        cell.classList.add(valid ? "block-blast__cell--preview" : "block-blast__cell--invalid");
+        if (valid) {
+          cell.style.background = shape.color;
+        }
+      }
+    }
+  }
+
+  private clearBoardPreview(): void {
+    if (!this.container) return;
+    this.container.querySelectorAll(".block-blast__cell--preview, .block-blast__cell--invalid").forEach((el) => {
+      const cell = el as HTMLElement;
+      cell.classList.remove("block-blast__cell--preview", "block-blast__cell--invalid");
+      if (!cell.dataset.hasColor) {
+        cell.style.background = "";
+      }
+    });
   }
 }
