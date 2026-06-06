@@ -382,19 +382,26 @@ export class BlockBlastRenderer {
     });
   }
 
-  private getDropAnchor(board: HTMLElement, clientX: number, clientY: number): { row: number; col: number } | null {
+  private getDropAnchor(board: HTMLElement, _clientX: number, _clientY: number): { row: number; col: number } | null {
     if (!this.drag) return null;
-    const aimX = clientX;
-    const aimY = clientY - this.drag.liftY;
+
+    // Adjust the aim point to account for ghost scale and lift
+    const ghostRect = this.drag.ghost.getBoundingClientRect();
+
+    // Calculate the center of the dragged ghost
+    const ghostCenterX = ghostRect.left + ghostRect.width / 2;
+    const ghostCenterY = ghostRect.top + ghostRect.height / 2;
+
     const boardRect = board.getBoundingClientRect();
     if (
-      aimX < boardRect.left ||
-      aimX > boardRect.right ||
-      aimY < boardRect.top ||
-      aimY > boardRect.bottom
+      ghostCenterX < boardRect.left ||
+      ghostCenterX > boardRect.right ||
+      ghostCenterY < boardRect.top ||
+      ghostCenterY > boardRect.bottom
     ) {
       return null;
     }
+
     const firstCell = board.querySelector<HTMLElement>(".block-blast__cell");
     const secondCell = board.querySelector<HTMLElement>('[data-row="0"][data-col="1"]');
     const belowCell = board.querySelector<HTMLElement>('[data-row="1"][data-col="0"]');
@@ -407,8 +414,10 @@ export class BlockBlastRenderer {
     const cellHeight = firstRect.height;
     const gapX = secondRect ? Math.max(0, secondRect.left - firstRect.right) : 0;
     const gapY = belowRect ? Math.max(0, belowRect.top - firstRect.bottom) : gapX;
-    const pointerCol = Math.floor((aimX - firstRect.left + gapX / 2) / (cellWidth + gapX));
-    const pointerRow = Math.floor((aimY - firstRect.top + gapY / 2) / (cellHeight + gapY));
+
+    // Calculate which cell the ghost center is over
+    const pointerCol = Math.floor((ghostCenterX - firstRect.left + gapX / 2) / (cellWidth + gapX));
+    const pointerRow = Math.floor((ghostCenterY - firstRect.top + gapY / 2) / (cellHeight + gapY));
     if (pointerRow < 0 || pointerRow >= SIZE || pointerCol < 0 || pointerCol >= SIZE) return null;
 
     return {

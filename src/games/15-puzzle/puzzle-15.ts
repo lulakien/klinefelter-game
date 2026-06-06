@@ -90,6 +90,7 @@ export class Puzzle15Renderer {
   private timerInterval: ReturnType<typeof setInterval> | null = null;
   private swipeStart: { index: number; x: number; y: number; pointerId: number } | null = null;
   private suppressClickIndex: number | null = null;
+  private animating = false;
 
   constructor(state: Puzzle15State) {
     this.state = state;
@@ -126,6 +127,8 @@ export class Puzzle15Renderer {
     if (this.state.startedAt === null) {
       this.state.startedAt = Date.now();
     }
+
+    // Swap tiles
     [this.state.tiles[emptyIndex], this.state.tiles[index]] = [this.state.tiles[index], this.state.tiles[emptyIndex]];
     this.state.moves++;
     this.state.won = isSolved(this.state.tiles);
@@ -135,7 +138,11 @@ export class Puzzle15Renderer {
       vibrate([25, 25, 25]);
     }
     playSfx(this.state.won ? "success" : "hit");
-    this.render();
+
+    // Animate the tile movement
+    this.animateTileMove(index, emptyIndex, () => {
+      this.render();
+    });
   }
 
   private render(): void {
@@ -243,5 +250,50 @@ export class Puzzle15Renderer {
     if (this.state.won) return;
     const el = this.container?.querySelector("#p15-time");
     if (el) el.textContent = `${getElapsedSeconds(this.state)}s`;
+  }
+
+  private animateTileMove(fromIndex: number, toIndex: number, onComplete: () => void): void {
+    if (!this.container || this.animating) {
+      onComplete();
+      return;
+    }
+
+    this.animating = true;
+    const board = this.container.querySelector(".puzzle-15__board") as HTMLElement | null;
+    if (!board) {
+      this.animating = false;
+      onComplete();
+      return;
+    }
+
+    const tiles = Array.from(board.querySelectorAll<HTMLElement>(".puzzle-15__tile, .puzzle-15__empty"));
+    const movingTile = tiles[fromIndex];
+    const emptySpace = tiles[toIndex];
+
+    if (!movingTile || !emptySpace) {
+      this.animating = false;
+      onComplete();
+      return;
+    }
+
+    const movingRect = movingTile.getBoundingClientRect();
+    const emptyRect = emptySpace.getBoundingClientRect();
+    const deltaX = emptyRect.left - movingRect.left;
+    const deltaY = emptyRect.top - movingRect.top;
+
+    // Apply animation
+    movingTile.style.transition = "transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+    movingTile.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+    movingTile.style.zIndex = "10";
+
+    setTimeout(() => {
+      if (movingTile) {
+        movingTile.style.transition = "";
+        movingTile.style.transform = "";
+        movingTile.style.zIndex = "";
+      }
+      this.animating = false;
+      onComplete();
+    }, 180);
   }
 }

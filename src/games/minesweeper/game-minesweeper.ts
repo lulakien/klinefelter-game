@@ -317,6 +317,10 @@ export class MinesweeperRenderer {
   private suppressClickKey: string | null = null;
   private suppressClickUntil = 0;
 
+  // Scroll position preservation
+  private savedScrollLeft = 0;
+  private savedScrollTop = 0;
+
   // Bound handlers
   private onContextMenu: (e: Event) => void;
 
@@ -464,6 +468,13 @@ export class MinesweeperRenderer {
     if (!this.container) return;
     submitWinningScore(this.state);
 
+    // Preserve scroll position before render
+    const scrollContainer = this.container.querySelector(".minesweeper__board-scroll") as HTMLElement | null;
+    if (scrollContainer) {
+      this.savedScrollLeft = scrollContainer.scrollLeft;
+      this.savedScrollTop = scrollContainer.scrollTop;
+    }
+
     const { cols, mineCount, flagsPlaced, gameOver, won } = this.state;
     const elapsed = getElapsed(this.state);
     const remaining = mineCount - flagsPlaced;
@@ -507,6 +518,13 @@ export class MinesweeperRenderer {
 
     // Bind events
     this.bindEvents();
+
+    // Restore scroll position after render
+    const newScrollContainer = this.container.querySelector(".minesweeper__board-scroll") as HTMLElement | null;
+    if (newScrollContainer && (this.savedScrollLeft > 0 || this.savedScrollTop > 0)) {
+      newScrollContainer.scrollLeft = this.savedScrollLeft;
+      newScrollContainer.scrollTop = this.savedScrollTop;
+    }
   }
 
   private renderBoardHTML(): string {
