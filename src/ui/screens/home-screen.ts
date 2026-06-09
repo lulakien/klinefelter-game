@@ -5,6 +5,7 @@ import { getStatusBadge, formatBytes } from "../../offline/offline-manager-ui.js
 import { onSWStatusChange, getSWStatus, getDeferredPrompt, clearDeferredPrompt, type SWStatus } from "../../pwa/register-sw.js";
 import { setScreenCleanup } from "../../app/app-shell.js";
 import { getPersonalBest } from "../../settings/scores-store.js";
+import { showWelcomeModal } from "../components/welcome-modal.js";
 import type { GameMeta, GameOfflineStatus } from "../../shared/game-types.js";
 
 /**
@@ -12,6 +13,9 @@ import type { GameMeta, GameOfflineStatus } from "../../shared/game-types.js";
  */
 
 let unsubSW: (() => void) | null = null;
+const FILTER_KEY = "klinefelter-home-filter";
+const TAG_FILTERS = ["all", "puzzle", "arcade", "multiplayer", "classic"] as const;
+type TagFilter = typeof TAG_FILTERS[number];
 
 export function renderHomeScreen(container: HTMLElement): void {
   // Clear any existing listener first
@@ -47,31 +51,57 @@ export function renderHomeScreen(container: HTMLElement): void {
   actions.innerHTML = `
     <a class="btn btn--secondary" href="#/settings">Settings</a>
     <a class="btn btn--secondary" href="#/offline">Offline Manager</a>
+    <a class="btn btn--secondary" href="#/stats">Stats</a>
   `;
   wrapper.appendChild(actions);
+
+  const activeFilter = getSavedFilter();
+  const filters = document.createElement("div");
+  filters.className = "tag-filters";
+  filters.setAttribute("aria-label", "Filter games by tag");
+  filters.innerHTML = TAG_FILTERS.map((tag) => `
+    <button class="tag-filter ${activeFilter === tag ? "tag-filter--active" : ""}"
+            type="button"
+            data-filter="${tag}"
+            aria-pressed="${activeFilter === tag}">
+      ${formatFilterLabel(tag)}
+    </button>
+  `).join("");
+  wrapper.appendChild(filters);
 
   // Game grid
   const grid = document.createElement("div");
   grid.className = "game-grid";
 
   const games = getAllGames();
-  for (const game of games) {
+  const visibleGames = filterGames(games, activeFilter);
+  for (const game of visibleGames) {
     grid.appendChild(createGameCard(game));
   }
 
   wrapper.appendChild(grid);
   container.appendChild(wrapper);
+  showWelcomeModal();
 
   // Update status badges asynchronously
-  for (const game of games) {
+  for (const game of visibleGames) {
     updateGameCardStatus(game.id);
   }
+
+  filters.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-filter]");
+    if (!button) return;
+    const filter = button.dataset.filter as TagFilter;
+    if (!TAG_FILTERS.includes(filter)) return;
+    saveFilter(filter);
+    renderHomeScreen(container);
+  });
 
   // Subscribe to SW status changes
   unsubSW = onSWStatusChange((status) => {
     renderInstallBanner(bannerContainer, status);
     // Refresh card states to handle offline/online transition
-    for (const game of games) {
+    for (const game of filterGames(games, getSavedFilter())) {
       updateGameCardStatus(game.id);
     }
   });
@@ -83,6 +113,33 @@ export function renderHomeScreen(container: HTMLElement): void {
       unsubSW = null;
     }
   });
+}
+
+function getSavedFilter(): TagFilter {
+  try {
+    const raw = localStorage.getItem(FILTER_KEY) as TagFilter | null;
+    return raw && TAG_FILTERS.includes(raw) ? raw : "all";
+  } catch {
+    return "all";
+  }
+}
+
+function saveFilter(filter: TagFilter): void {
+  try {
+    localStorage.setItem(FILTER_KEY, filter);
+  } catch {
+    // Non-critical preference.
+  }
+}
+
+function filterGames(games: ReadonlyArray<GameMeta>, filter: TagFilter): ReadonlyArray<GameMeta> {
+  if (filter === "all") return games;
+  if (filter === "multiplayer") return games.filter((game) => game.multiplayerSupport !== "none");
+  return games.filter((game) => game.tags.includes(filter));
+}
+
+function formatFilterLabel(filter: TagFilter): string {
+  return filter === "all" ? "All" : filter[0].toUpperCase() + filter.slice(1);
 }
 
 function renderInstallBanner(container: HTMLElement, status: SWStatus): void {

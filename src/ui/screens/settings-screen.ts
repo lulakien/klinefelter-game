@@ -1,5 +1,10 @@
 import { getSettings, updateSettings } from "../../settings/settings-store.js";
 import { exportErrorLogs, getErrorCount, clearErrorLogs } from "../../core/error-logger.js";
+import {
+  clearPerformanceRecords,
+  exportPerformanceReport,
+  getPerformanceSummary,
+} from "../../core/performance-monitor.js";
 import type { QualityMode } from "../../shared/game-types.js";
 
 /**
@@ -73,10 +78,22 @@ export function renderSettingsScreen(container: HTMLElement): void {
         <span>Reduced Motion</span>
         <input type="checkbox" id="setting-reduced-motion" ${settings.reducedMotion ? "checked" : ""} />
       </label>
+      <label class="setting-row setting-row--stacked">
+        <span class="setting-label">Target FPS</span>
+        <select id="setting-target-fps" class="nickname-input">
+          <option value="30" ${settings.targetFps === 30 ? "selected" : ""}>30 FPS</option>
+          <option value="60" ${settings.targetFps === 60 ? "selected" : ""}>60 FPS</option>
+          <option value="120" ${settings.targetFps === 120 ? "selected" : ""}>120 FPS</option>
+        </select>
+      </label>
+      <div class="settings-note" id="performance-summary">
+        ${renderPerformanceSummary()}
+      </div>
     </section>
 
     <div class="settings-actions">
       <button class="btn btn--secondary" id="btn-export-errors" style="margin-right: 8px;">Report Bug</button>
+      <button class="btn btn--secondary" id="btn-export-performance" style="margin-right: 8px;">Performance Report</button>
       <a class="btn btn--secondary" href="#/">Back to Home</a>
     </div>
   `;
@@ -124,6 +141,7 @@ function bindSettingsEvents(): void {
   bindCheckbox("setting-sizes", "showEstimatedSizes");
   bindCheckbox("setting-manual-updates", "manualUpdateChecksOnly");
   bindCheckbox("setting-reduced-motion", "reducedMotion");
+  bindTargetFps();
 
   // Export errors button
   const exportBtn = document.getElementById("btn-export-errors") as HTMLButtonElement | null;
@@ -150,6 +168,26 @@ function bindSettingsEvents(): void {
       }
     });
   }
+
+  const perfBtn = document.getElementById("btn-export-performance") as HTMLButtonElement | null;
+  if (perfBtn) {
+    perfBtn.addEventListener("click", () => {
+      const report = exportPerformanceReport();
+      const blob = new Blob([report], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `klinefelter-performance-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      if (confirm("Performance report exported. Clear performance records?")) {
+        clearPerformanceRecords();
+        const summary = document.getElementById("performance-summary");
+        if (summary) summary.textContent = renderPerformanceSummary();
+      }
+    });
+  }
 }
 
 function bindCheckbox(id: string, key: string): void {
@@ -157,6 +195,17 @@ function bindCheckbox(id: string, key: string): void {
   if (!el) return;
   el.addEventListener("change", () => {
     updateSettings({ [key]: el.checked });
+  });
+}
+
+function bindTargetFps(): void {
+  const el = document.getElementById("setting-target-fps") as HTMLSelectElement | null;
+  if (!el) return;
+  el.addEventListener("change", () => {
+    const value = Number(el.value);
+    if (value === 30 || value === 60 || value === 120) {
+      updateSettings({ targetFps: value });
+    }
   });
 }
 
@@ -169,4 +218,12 @@ function escapeHtml(text: string): string {
 function normalizeNickname(value: string): string {
   const nickname = value.trim().replace(/\s+/g, " ");
   return nickname || "Player";
+}
+
+function renderPerformanceSummary(): string {
+  const summary = getPerformanceSummary();
+  if (summary.count === 0) return "No performance records yet.";
+  const load = summary.avgLoadMs ? `${summary.avgLoadMs}ms avg load` : "no load samples";
+  const session = summary.avgSessionMs ? `${Math.round(summary.avgSessionMs / 1000)}s avg session` : "no session samples";
+  return `${summary.count} records · ${load} · ${session}`;
 }

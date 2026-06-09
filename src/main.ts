@@ -16,8 +16,10 @@ import { renderHomeScreen } from "./ui/screens/home-screen.js";
 import { renderSettingsScreen } from "./ui/screens/settings-screen.js";
 import { renderOfflineScreen } from "./ui/screens/offline-screen.js";
 import { renderScoresScreen } from "./ui/screens/scores-screen.js";
+import { renderStatsScreen } from "./ui/screens/stats-screen.js";
 import { renderGameScreen, destroyCurrentGame } from "./ui/screens/game-screen.js";
 import { playSfx } from "./app/audio-manager.js";
+import { installGlobalErrorHandlers } from "./core/error-logger.js";
 
 // ---- Boot ----
 
@@ -28,6 +30,7 @@ if (!appContainer) {
 }
 
 mountAppShell(appContainer);
+installGlobalErrorHandlers();
 
 // ---- Route handlers ----
 // IMPORTANT: destroyCurrentGame() must be called BEFORE clearContent()
@@ -65,6 +68,14 @@ on("/scores", () => {
   const content = getContentElement();
   clearContent();
   renderScoresScreen(content);
+});
+
+on("/stats", () => {
+  destroyCurrentGame();
+  triggerScreenCleanup();
+  const content = getContentElement();
+  clearContent();
+  renderStatsScreen(content);
 });
 
 on("/games/:gameId", (params) => {

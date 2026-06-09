@@ -7,6 +7,7 @@
  */
 
 import { triggerSWUpdate } from "../pwa/register-sw.js";
+import { showWelcomeModal } from "../ui/components/welcome-modal.js";
 
 const APP_SHELL_ID = "app-shell";
 
@@ -32,8 +33,17 @@ export function mountAppShell(container: HTMLElement): void {
   statusBadge.id = "topbar-status";
   statusBadge.textContent = "";
 
+  const helpBtn = document.createElement("button");
+  helpBtn.className = "app-topbar__help";
+  helpBtn.type = "button";
+  helpBtn.setAttribute("aria-label", "Show welcome guide");
+  helpBtn.title = "Show welcome guide";
+  helpBtn.textContent = "?";
+  helpBtn.addEventListener("click", () => showWelcomeModal(true));
+
   topBarEl.appendChild(title);
   topBarEl.appendChild(statusBadge);
+  topBarEl.appendChild(helpBtn);
 
   // Content area
   contentEl = document.createElement("main");

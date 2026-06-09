@@ -20,6 +20,14 @@ export interface ErrorLog {
   };
 }
 
+function getBrowserInfo(): ErrorLog["browserInfo"] {
+  return {
+    userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
+    platform: typeof navigator !== "undefined" ? navigator.platform : "unknown",
+    language: typeof navigator !== "undefined" ? navigator.language : "unknown",
+  };
+}
+
 /** Log an error with context */
 export function logError(error: Error | string, context?: string): void {
   try {
@@ -28,11 +36,7 @@ export function logError(error: Error | string, context?: string): void {
       message: typeof error === "string" ? error : error.message,
       stack: typeof error === "object" ? error.stack : undefined,
       context,
-      browserInfo: {
-        userAgent: navigator.userAgent,
-        platform: navigator.platform,
-        language: navigator.language,
-      },
+      browserInfo: getBrowserInfo(),
     };
 
     const logs = getErrorLogs();
@@ -104,4 +108,28 @@ export function withErrorLogging<T extends (...args: any[]) => any>(
       throw error;
     }
   }) as T;
+}
+
+/** Capture uncaught browser errors once during app bootstrap. */
+export function installGlobalErrorHandlers(): void {
+  if (typeof window === "undefined") return;
+  const marker = "__klinefelterErrorHandlersInstalled";
+  const target = window as Window & { [marker]?: boolean };
+  if (target[marker]) return;
+  target[marker] = true;
+
+  window.addEventListener("error", (event) => {
+    const error = event.error instanceof Error
+      ? event.error
+      : new Error(event.message || "Unhandled window error");
+    logError(error, "global:error");
+  });
+
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event.reason;
+    const error = reason instanceof Error
+      ? reason
+      : new Error(typeof reason === "string" ? reason : "Unhandled promise rejection");
+    logError(error, "global:unhandledrejection");
+  });
 }

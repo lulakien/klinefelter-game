@@ -15,6 +15,18 @@ export interface GameSave<T = any> {
   version: string;
 }
 
+function isSaveRecord<T>(value: unknown, gameId: string): value is GameSave<T> {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Partial<GameSave<T>>;
+  return (
+    record.gameId === gameId &&
+    typeof record.timestamp === "number" &&
+    Number.isFinite(record.timestamp) &&
+    typeof record.version === "string" &&
+    "state" in record
+  );
+}
+
 /** Save game state to localStorage */
 export function saveGameState<T>(gameId: string, state: T, version: string = "1.0.0"): void {
   try {
@@ -37,7 +49,11 @@ export function loadGameState<T>(gameId: string): GameSave<T> | null {
     const raw = localStorage.getItem(SAVE_PREFIX + gameId);
     if (!raw) return null;
 
-    const save: GameSave<T> = JSON.parse(raw);
+    const save = JSON.parse(raw);
+    if (!isSaveRecord<T>(save, gameId)) {
+      clearGameState(gameId);
+      return null;
+    }
 
     // Check if save is expired (7 days)
     const age = Date.now() - save.timestamp;
@@ -95,14 +111,20 @@ export class AutoSaveManager<T> {
     this.version = version;
   }
 
-  /** Start auto-saving every N seconds */
-  start(getState: () => T, intervalSeconds: number = 5): void {
+  /** Start auto-saving every N seconds. */
+  start(
+    getState: () => T,
+    intervalSeconds: number = 5,
+    shouldSave: (state: T) => boolean = Boolean,
+  ): void {
     this.stop(); // Clear any existing interval
 
     this.intervalId = setInterval(() => {
       const state = getState();
-      if (state) {
+      if (shouldSave(state)) {
         saveGameState(this.gameId, state, this.version);
+      } else {
+        clearGameState(this.gameId);
       }
     }, intervalSeconds * 1000);
   }

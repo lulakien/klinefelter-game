@@ -7,6 +7,7 @@
 
 import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
+import { getSettings, onSettingsChange } from "../../settings/settings-store.js";
 
 // ---- Constants ----
 
@@ -185,15 +186,24 @@ export class SnakeRenderer {
   private onTouch: (e: TouchEvent) => void;
   private touchStart: Point | null = null;
   private destroyed = false;
+  private targetFrameMs = 1000 / getSettings().targetFps;
+  private lastFrameTimestamp = 0;
+  private unsubscribeSettings: (() => void) | null = null;
 
   constructor(state: SnakeState) {
     this.state = state;
     this.canvas = document.createElement("canvas");
     this.ctx = this.canvas.getContext("2d")!;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.dpr = getSettings().qualityMode === "ultra-low"
+      ? 1
+      : Math.min(window.devicePixelRatio || 1, 2);
 
     this.onKeyDown = this.handleKey.bind(this);
     this.onTouch = this.handleTouch.bind(this);
+  }
+
+  getState(): any {
+    return this.state;
   }
 
   mount(container: HTMLElement): void {
@@ -222,6 +232,8 @@ export class SnakeRenderer {
     this.canvas.height = canvasSize * this.dpr;
     this.canvas.style.width = `${canvasSize}px`;
     this.canvas.style.height = `${canvasSize}px`;
+    this.canvas.style.maxWidth = "100%";
+    this.canvas.style.height = "auto";
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
     boardWrap.appendChild(this.canvas);
@@ -249,10 +261,14 @@ export class SnakeRenderer {
     this.canvas.addEventListener("touchstart", this.onTouch, { passive: false });
     this.canvas.addEventListener("touchmove", this.onTouch, { passive: false });
     this.canvas.addEventListener("touchend", this.onTouch, { passive: false });
+    this.unsubscribeSettings = onSettingsChange((settings) => {
+      this.targetFrameMs = 1000 / settings.targetFps;
+    });
 
     // Start loop
     cancelAnimationFrame(this.animFrame);
     this.state.lastTimestamp = performance.now();
+    this.lastFrameTimestamp = this.state.lastTimestamp;
     this.draw();
     this.updateUI();
     this.animFrame = requestAnimationFrame(() => this.tick());
@@ -265,6 +281,8 @@ export class SnakeRenderer {
     this.canvas.removeEventListener("touchstart", this.onTouch);
     this.canvas.removeEventListener("touchmove", this.onTouch);
     this.canvas.removeEventListener("touchend", this.onTouch);
+    this.unsubscribeSettings?.();
+    this.unsubscribeSettings = null;
     if (this.container) {
       this.container.innerHTML = "";
     }
@@ -273,6 +291,11 @@ export class SnakeRenderer {
   private tick(): void {
     if (this.destroyed) return; // Stop loop if destroyed
     const now = performance.now();
+    if (now - this.lastFrameTimestamp < this.targetFrameMs) {
+      this.animFrame = requestAnimationFrame(() => this.tick());
+      return;
+    }
+    this.lastFrameTimestamp = now;
     const dt = now - this.state.lastTimestamp;
     this.state.lastTimestamp = now;
 

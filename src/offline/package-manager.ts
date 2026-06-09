@@ -6,7 +6,8 @@
  */
 
 import type { GameOfflineStatus } from "../shared/game-types.js";
-import { getAllGames, GAME_LOADERS } from "../app/game-registry.js";
+import { getAllGames, GAME_LOADERS, getGameSize } from "../app/game-registry.js";
+import { getQualityMode } from "../settings/settings-store.js";
 
 // ---- IndexedDB ----
 
@@ -203,17 +204,24 @@ export async function downloadGame(
     if (!loader) throw new Error(`No loader for game: ${gameId}`);
 
     await loader();
+    onProgress?.({
+      gameId,
+      phase: "downloading",
+      loaded: 1,
+      total: 1,
+    });
 
     // Verify it's now in cache
     const cached = await isGameInCache(gameId);
 
     if (cached) {
+      const qualityMode = getQualityMode();
       await putRecord({
         gameId,
         installedVersion: game.version,
         installedAt: Date.now(),
-        qualityMode: "high-quality",
-        sizeBytes: game.estimatedSizeHigh,
+        qualityMode,
+        sizeBytes: getGameSize(game, qualityMode),
         status: "installed",
       });
 

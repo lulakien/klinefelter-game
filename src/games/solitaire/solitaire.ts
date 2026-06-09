@@ -5,6 +5,7 @@
 
 import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
+import { HistoryManager } from "../../core/history-manager.js";
 
 type Suit = "H" | "D" | "C" | "S";
 type Zone = "stock" | "waste" | "foundation" | "tableau";
@@ -169,6 +170,20 @@ export class SolitaireRenderer {
   private animatingWasteCardId: string | null = null;
   private timerInterval: ReturnType<typeof setInterval> | null = null;
   private lastTap: { key: string; at: number } | null = null;
+  private history = new HistoryManager<SolitaireState>(50);
+  private onKeyDown = (event: KeyboardEvent) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+      event.preventDefault();
+      if (event.shiftKey) {
+        this.redo();
+      } else {
+        this.undo();
+      }
+    } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+      event.preventDefault();
+      this.redo();
+    }
+  };
 
   constructor(state: SolitaireState) {
     this.state = state;
@@ -176,11 +191,16 @@ export class SolitaireRenderer {
     this.boundOnUp = this.onPointerUp.bind(this);
   }
 
+  getState(): any {
+    return this.state;
+  }
+
   mount(container: HTMLElement): void {
     this.container = container;
     this.render();
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.timerInterval = setInterval(() => this.updateTimer(), 500);
+    window.addEventListener("keydown", this.onKeyDown);
   }
 
   destroy(): void {
@@ -189,17 +209,20 @@ export class SolitaireRenderer {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
     }
+    window.removeEventListener("keydown", this.onKeyDown);
     this.container = null;
   }
 
   private restart(): void {
     this.endDrag();
     this.state = createSolitaireGame();
+    this.history.clear();
     this.render();
   }
 
   private drawStock(): void {
     if (this.state.stock.length > 0) {
+      this.pushUndoSnapshot();
       const card = this.state.stock.pop()!;
       card.faceUp = true;
       this.state.waste.push(card);
@@ -207,6 +230,7 @@ export class SolitaireRenderer {
       this.state.moves++;
       playSfx("hit");
     } else if (this.state.waste.length > 0) {
+      this.pushUndoSnapshot();
       this.state.stock = this.state.waste.reverse().map((card) => ({ ...card, faceUp: false }));
       this.state.waste = [];
       this.state.moves++;
@@ -246,6 +270,10 @@ export class SolitaireRenderer {
       return;
     }
     this.lastTap = { key, at: now };
+    if (this.autoMoveCard(selection)) {
+      this.render();
+      return;
+    }
     this.select(selection);
   }
 
@@ -260,6 +288,7 @@ export class SolitaireRenderer {
       const pile = this.state.tableau[target.pile];
       if (source.zone === "tableau" && source.pile === target.pile) return false;
       if (!canStackOnTableau(first, pile[pile.length - 1])) return false;
+      this.pushUndoSnapshot();
       const moving = removeSelectionCards(this.state, source);
       pile.push(...moving);
       this.state.selected = null;
@@ -270,11 +299,48 @@ export class SolitaireRenderer {
     if (target.zone === "foundation" && cards.length === 1) {
       const foundation = this.state.foundations[target.pile];
       if (!canMoveToFoundation(first, foundation)) return false;
+      this.pushUndoSnapshot();
       const moving = removeSelectionCards(this.state, source);
       foundation.push(...moving);
       this.state.selected = null;
       afterMove(this.state, source);
       return true;
+    }
+
+    return false;
+  }
+
+  private autoMoveCard(selection: Selection): boolean {
+    const cards = getSelectionCards(this.state, selection);
+    if (!cards.length || !cards[0].faceUp) return false;
+
+    const wasSelected = this.state.selected;
+    if (this.moveSingleCardToFoundation(selection)) {
+      playSfx(this.state.won ? "success" : "hit");
+      this.maybeAutoComplete();
+      return true;
+    }
+
+    this.state.selected = wasSelected;
+    if (this.moveCardsToBestTableau(selection)) {
+      playSfx("hit");
+      return true;
+    }
+
+    this.state.selected = wasSelected;
+    return false;
+  }
+
+  private moveCardsToBestTableau(selection: Selection): boolean {
+    const cards = getSelectionCards(this.state, selection);
+    if (!cards.length || !cards[0].faceUp) return false;
+
+    for (let pileIndex = 0; pileIndex < this.state.tableau.length; pileIndex++) {
+      if (selection.zone === "tableau" && selection.pile === pileIndex) continue;
+      const pile = this.state.tableau[pileIndex];
+      if (!canStackOnTableau(cards[0], pile[pile.length - 1])) continue;
+      this.state.selected = selection;
+      return this.tryMove({ zone: "tableau", pile: pileIndex, index: pile.length });
     }
 
     return false;
@@ -397,6 +463,7 @@ export class SolitaireRenderer {
         const pileIndex = Number(tableauPile.dataset.pile);
         const pile = this.state.tableau[pileIndex];
         if (canStackOnTableau(first, pile[pile.length - 1])) {
+          this.pushUndoSnapshot();
           const moving = removeSelectionCards(this.state, selection);
           pile.push(...moving);
           this.state.selected = null;
@@ -407,6 +474,7 @@ export class SolitaireRenderer {
         const pileIndex = Number(foundation.dataset.pile);
         const pile = this.state.foundations[pileIndex];
         if (canMoveToFoundation(first, pile)) {
+          this.pushUndoSnapshot();
           const moving = removeSelectionCards(this.state, selection);
           pile.push(...moving);
           this.state.selected = null;
@@ -574,7 +642,14 @@ export class SolitaireRenderer {
     // Actions
     const actions = document.createElement("div");
     actions.className = "puzzle-actions";
-    actions.innerHTML = '<button class="btn btn--secondary" id="solitaire-restart">New Game</button><a class="btn btn--secondary" href="#/">Back to Home</a>';
+    actions.innerHTML = `
+      <button class="btn btn--secondary" id="solitaire-undo" ${this.history.canUndo() ? "" : "disabled"}>Undo</button>
+      <button class="btn btn--secondary" id="solitaire-redo" ${this.history.canRedo() ? "" : "disabled"}>Redo</button>
+      <button class="btn btn--secondary" id="solitaire-restart">New Game</button>
+      <a class="btn btn--secondary" href="#/">Back to Home</a>
+    `;
+    actions.querySelector("#solitaire-undo")?.addEventListener("click", () => this.undo());
+    actions.querySelector("#solitaire-redo")?.addEventListener("click", () => this.redo());
     actions.querySelector("#solitaire-restart")?.addEventListener("click", () => this.restart());
     wrapper.appendChild(actions);
 
@@ -595,8 +670,19 @@ export class SolitaireRenderer {
     const red = isRed(card) ? " card--red" : " card--black";
     el.className = `card${red}${selected ? " card--selected" : ""}${card.faceUp ? "" : " card--back"}`;
     if (card.faceUp) {
-      el.innerHTML = `<span>${RANKS[card.rank]}</span><span>${SUIT_SYMBOLS[card.suit]}</span>`;
+      el.innerHTML = `
+        <span class="card__corner card__corner--top">
+          <strong>${RANKS[card.rank]}</strong>
+          <span>${SUIT_SYMBOLS[card.suit]}</span>
+        </span>
+        <span class="card__pip" aria-hidden="true">${SUIT_SYMBOLS[card.suit]}</span>
+        <span class="card__corner card__corner--bottom">
+          <strong>${RANKS[card.rank]}</strong>
+          <span>${SUIT_SYMBOLS[card.suit]}</span>
+        </span>
+      `;
     }
+    el.setAttribute("aria-label", card.faceUp ? `${RANKS[card.rank]} of ${card.suit}` : "Face down card");
     return el;
   }
 
@@ -610,5 +696,33 @@ export class SolitaireRenderer {
     if (this.state.won) return;
     const el = this.container?.querySelector("#solitaire-time");
     if (el) el.textContent = `${getElapsedSeconds(this.state)}s`;
+  }
+
+  private pushUndoSnapshot(): void {
+    const snapshot = structuredClone(this.state);
+    snapshot.selected = null;
+    this.history.push(snapshot);
+  }
+
+  private undo(): void {
+    const previous = this.history.undo(this.state);
+    if (!previous) return;
+    this.endDrag();
+    previous.selected = null;
+    this.state = previous;
+    this.animatingWasteCardId = null;
+    playSfx("click");
+    this.render();
+  }
+
+  private redo(): void {
+    const next = this.history.redo(this.state);
+    if (!next) return;
+    this.endDrag();
+    next.selected = null;
+    this.state = next;
+    this.animatingWasteCardId = null;
+    playSfx("click");
+    this.render();
   }
 }

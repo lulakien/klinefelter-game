@@ -4,6 +4,7 @@
 
 import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
+import { HistoryManager } from "../../core/history-manager.js";
 
 const SIZE = 4;
 const TILE_COUNT = SIZE * SIZE;
@@ -91,15 +92,34 @@ export class Puzzle15Renderer {
   private swipeStart: { index: number; x: number; y: number; pointerId: number } | null = null;
   private suppressClickIndex: number | null = null;
   private animating = false;
+  private history = new HistoryManager<Puzzle15State>(50);
+  private onKeyDown = (event: KeyboardEvent) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+      event.preventDefault();
+      if (event.shiftKey) {
+        this.redo();
+      } else {
+        this.undo();
+      }
+    } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+      event.preventDefault();
+      this.redo();
+    }
+  };
 
   constructor(state: Puzzle15State) {
     this.state = state;
+  }
+
+  getState(): any {
+    return this.state;
   }
 
   mount(container: HTMLElement): void {
     this.container = container;
     this.render();
     this.timerInterval = setInterval(() => this.updateTimer(), 500);
+    window.addEventListener("keydown", this.onKeyDown);
   }
 
   destroy(): void {
@@ -109,10 +129,12 @@ export class Puzzle15Renderer {
     }
     if (this.container) this.container.innerHTML = "";
     this.container = null;
+    window.removeEventListener("keydown", this.onKeyDown);
   }
 
   private restart(): void {
     this.state = createPuzzle15Game();
+    this.history.clear();
     this.render();
   }
 
@@ -128,9 +150,12 @@ export class Puzzle15Renderer {
       this.state.startedAt = Date.now();
     }
 
+    const before = structuredClone(this.state);
+
     // Swap tiles
     [this.state.tiles[emptyIndex], this.state.tiles[index]] = [this.state.tiles[index], this.state.tiles[emptyIndex]];
     this.state.moves++;
+    this.history.push(before);
     this.state.won = isSolved(this.state.tiles);
     if (this.state.won) {
       this.state.elapsedSeconds = getElapsedSeconds(this.state);
@@ -167,6 +192,8 @@ export class Puzzle15Renderer {
           ${this.state.tiles.map((tile, index) => this.renderTile(tile, index)).join("")}
         </div>
         <div class="puzzle-actions">
+          <button class="btn btn--secondary" id="p15-undo" ${this.history.canUndo() ? "" : "disabled"}>Undo</button>
+          <button class="btn btn--secondary" id="p15-redo" ${this.history.canRedo() ? "" : "disabled"}>Redo</button>
           <button class="btn btn--secondary" id="p15-restart">New Game</button>
           <a class="btn btn--secondary" href="#/">Back to Home</a>
         </div>
@@ -175,6 +202,8 @@ export class Puzzle15Renderer {
     `;
 
     this.container.querySelector("#p15-restart")?.addEventListener("click", () => this.restart());
+    this.container.querySelector("#p15-undo")?.addEventListener("click", () => this.undo());
+    this.container.querySelector("#p15-redo")?.addEventListener("click", () => this.redo());
     this.container.querySelectorAll<HTMLElement>(".puzzle-15__tile").forEach((tileEl) => {
       tileEl.addEventListener("click", () => {
         const index = Number(tileEl.dataset.index);
@@ -250,6 +279,22 @@ export class Puzzle15Renderer {
     if (this.state.won) return;
     const el = this.container?.querySelector("#p15-time");
     if (el) el.textContent = `${getElapsedSeconds(this.state)}s`;
+  }
+
+  private undo(): void {
+    const previous = this.history.undo(this.state);
+    if (!previous) return;
+    this.state = previous;
+    playSfx("click");
+    this.render();
+  }
+
+  private redo(): void {
+    const next = this.history.redo(this.state);
+    if (!next) return;
+    this.state = next;
+    playSfx("click");
+    this.render();
   }
 
   private animateTileMove(fromIndex: number, toIndex: number, onComplete: () => void): void {

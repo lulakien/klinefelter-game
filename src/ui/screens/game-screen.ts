@@ -3,6 +3,9 @@ import { setTopBarStatus, showErrorFallback, getContentElement } from "../../app
 import { getGameOfflineStatus } from "../../offline/package-manager.js";
 import { getSWStatus } from "../../pwa/register-sw.js";
 import { navigate } from "../../app/router.js";
+import { recordGamePlaytime, recordGameStarted } from "../../settings/stats-store.js";
+import { chooseDifficulty } from "../components/difficulty-modal.js";
+import { recordPerformanceMetric } from "../../core/performance-monitor.js";
 
 /**
  * Game screen — loads and mounts a game module dynamically.
@@ -54,6 +57,11 @@ export async function renderGameScreen(
 
   setTopBarStatus(game.name);
 
+  const launchOptions = await chooseDifficulty(game);
+  if (myGeneration !== loadGeneration) {
+    return;
+  }
+
   // Show loading state
   container.innerHTML = `
     <div class="game-loading">
@@ -72,7 +80,9 @@ export async function renderGameScreen(
   }
 
   try {
+    const loadStartedAt = performance.now();
     const module = await loader();
+    recordPerformanceMetric(gameId, "load", performance.now() - loadStartedAt);
 
     // Check that no newer renderGameScreen call happened while we awaited
     if (myGeneration !== loadGeneration) {
@@ -82,8 +92,11 @@ export async function renderGameScreen(
     // Ensure container is still clear (may have been repurposed)
     container.innerHTML = "";
 
+    recordGameStarted(gameId);
+    const playStartedAt = performance.now();
     const cleanup = await module.mount(container, game, {
       exitToMenu: () => navigate("/"),
+      ...launchOptions,
     });
 
     // Check again — the mount might have been async too
@@ -92,7 +105,12 @@ export async function renderGameScreen(
       return;
     }
 
-    currentCleanup = cleanup;
+    currentCleanup = () => {
+      const sessionMs = performance.now() - playStartedAt;
+      recordGamePlaytime(gameId, sessionMs / 1000);
+      recordPerformanceMetric(gameId, "session", sessionMs);
+      cleanup();
+    };
   } catch (err) {
     // Only show error if this is still the current load
     if (myGeneration === loadGeneration) {

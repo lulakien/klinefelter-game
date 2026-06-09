@@ -329,6 +329,10 @@ export class MinesweeperRenderer {
     this.onContextMenu = (e: Event) => e.preventDefault();
   }
 
+  getState(): any {
+    return this.state;
+  }
+
   private setDifficulty(difficulty: Difficulty): void {
     this.state = createGame(difficulty);
     this.render();

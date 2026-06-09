@@ -219,6 +219,10 @@ export class ConnectFourRenderer {
     this.state = state;
   }
 
+  getState(): any {
+    return this.state;
+  }
+
   mount(container: HTMLElement): void {
     this.container = container;
     this.render();

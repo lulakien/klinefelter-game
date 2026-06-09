@@ -56,6 +56,10 @@ function parseHash(hash: string): RouteState {
     return { route: "scores", params: {} };
   }
 
+  if (segments[0] === "stats") {
+    return { route: "stats", params: {} };
+  }
+
   return { route: "home", params: {} };
 }
 

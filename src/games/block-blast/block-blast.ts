@@ -170,6 +170,10 @@ export class BlockBlastRenderer {
     this.boundOnUp = this.onPointerUp.bind(this);
   }
 
+  getState(): any {
+    return this.state;
+  }
+
   mount(container: HTMLElement): void {
     this.container = container;
     this.render();

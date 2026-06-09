@@ -7,6 +7,7 @@
 
 import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
+import { HistoryManager } from "../../core/history-manager.js";
 
 type ColorId = number;
 type Tube = ColorId[];
@@ -215,14 +216,33 @@ export class WaterSortRenderer {
   private container: HTMLElement | null = null;
   private state: WaterSortState;
   private pouringTimer: ReturnType<typeof setTimeout> | null = null;
+  private history = new HistoryManager<WaterSortState>(50);
+  private onKeyDown = (event: KeyboardEvent) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+      event.preventDefault();
+      if (event.shiftKey) {
+        this.redo();
+      } else {
+        this.undo();
+      }
+    } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+      event.preventDefault();
+      this.redo();
+    }
+  };
 
   constructor(state: WaterSortState) {
     this.state = state;
   }
 
+  getState(): any {
+    return this.state;
+  }
+
   mount(container: HTMLElement): void {
     this.container = container;
     this.render();
+    window.addEventListener("keydown", this.onKeyDown);
   }
 
   destroy(): void {
@@ -233,6 +253,7 @@ export class WaterSortRenderer {
     if (this.container) {
       this.container.innerHTML = "";
     }
+    window.removeEventListener("keydown", this.onKeyDown);
   }
 
   private setDifficulty(difficulty: WaterSortDifficulty): void {
@@ -262,8 +283,10 @@ export class WaterSortRenderer {
 
     // Animate pour then apply state
     this.animatePour(from, index, () => {
+      const before = structuredClone(this.state);
       const moved = pour(this.state.tubes, from, index);
       if (moved) {
+        this.history.push(before);
         this.state.moves++;
         this.state.won = isWon(this.state.tubes);
         if (!this.state.won) {
@@ -313,6 +336,7 @@ export class WaterSortRenderer {
       this.pouringTimer = null;
     }
     this.state = createWaterSortGame(this.state.difficulty);
+    this.history.clear();
     this.render();
   }
 
@@ -385,7 +409,14 @@ export class WaterSortRenderer {
     // Actions
     const actions = document.createElement("div");
     actions.className = "puzzle-actions";
-    actions.innerHTML = '<button class="btn btn--secondary" id="water-restart">New Game</button><a class="btn btn--secondary" href="#/">Back to Home</a>';
+    actions.innerHTML = `
+      <button class="btn btn--secondary" id="water-undo" ${this.history.canUndo() ? "" : "disabled"}>Undo</button>
+      <button class="btn btn--secondary" id="water-redo" ${this.history.canRedo() ? "" : "disabled"}>Redo</button>
+      <button class="btn btn--secondary" id="water-restart">New Game</button>
+      <a class="btn btn--secondary" href="#/">Back to Home</a>
+    `;
+    actions.querySelector("#water-undo")?.addEventListener("click", () => this.undo());
+    actions.querySelector("#water-redo")?.addEventListener("click", () => this.redo());
     actions.querySelector("#water-restart")?.addEventListener("click", () => this.restart());
     wrapper.appendChild(actions);
 
@@ -416,5 +447,21 @@ export class WaterSortRenderer {
         this.setDifficulty(value);
       }
     });
+  }
+
+  private undo(): void {
+    const previous = this.history.undo(this.state);
+    if (!previous) return;
+    this.state = previous;
+    playSfx("click");
+    this.render();
+  }
+
+  private redo(): void {
+    const next = this.history.redo(this.state);
+    if (!next) return;
+    this.state = next;
+    playSfx("click");
+    this.render();
   }
 }

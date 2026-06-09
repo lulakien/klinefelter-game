@@ -7,6 +7,7 @@
 
 import { playSfx, vibrate } from "../../app/audio-manager.js";
 import { getPersonalBest, saveScore } from "../../settings/scores-store.js";
+import { HistoryManager } from "../../core/history-manager.js";
 
 // ---- Types ----
 
@@ -315,12 +316,17 @@ export class Game2048Renderer {
   private onKeyDown: (e: KeyboardEvent) => void;
   private onTouchStart: (e: TouchEvent) => void;
   private onTouchEnd: (e: TouchEvent) => void;
+  private history = new HistoryManager<GameState>(50);
 
   constructor(state: GameState) {
     this.state = state;
     this.onKeyDown = this.handleKeyDown.bind(this);
     this.onTouchStart = this.handleTouchStart.bind(this);
     this.onTouchEnd = this.handleTouchEnd.bind(this);
+  }
+
+  getState(): any {
+    return this.state;
   }
 
   mount(container: HTMLElement): void {
@@ -342,6 +348,21 @@ export class Game2048Renderer {
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        this.redo();
+      } else {
+        this.undo();
+      }
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+      e.preventDefault();
+      this.redo();
+      return;
+    }
+
     const keyMap: Record<string, Direction> = {
       arrowup: "up",
       arrowdown: "down",
@@ -356,8 +377,10 @@ export class Game2048Renderer {
     const dir = keyMap[e.key.toLowerCase()];
     if (dir) {
       e.preventDefault();
+      const before = structuredClone(this.state);
       const moved = move(this.state, dir);
       if (moved) {
+        this.history.push(before);
         playSfx("hit");
         this.render();
       }
@@ -395,8 +418,10 @@ export class Game2048Renderer {
       dir = dy > 0 ? "down" : "up";
     }
 
+    const before = structuredClone(this.state);
     const moved = move(this.state, dir);
     if (moved) {
+      this.history.push(before);
       playSfx("hit");
       this.render();
     }
@@ -431,6 +456,8 @@ export class Game2048Renderer {
         </div>
 
         <div class="game-2048__controls">
+          <button class="btn btn--secondary" id="btn-2048-undo" ${this.history.canUndo() ? "" : "disabled"}>Undo</button>
+          <button class="btn btn--secondary" id="btn-2048-redo" ${this.history.canRedo() ? "" : "disabled"}>Redo</button>
           <button class="btn btn--secondary" id="btn-2048-restart">New Game</button>
           <a class="btn btn--secondary" href="#/">Back to Home</a>
         </div>
@@ -449,6 +476,10 @@ export class Game2048Renderer {
     // Bind restart button
     this.container.querySelector("#btn-2048-restart")
       ?.addEventListener("click", () => this.restart());
+    this.container.querySelector("#btn-2048-undo")
+      ?.addEventListener("click", () => this.undo());
+    this.container.querySelector("#btn-2048-redo")
+      ?.addEventListener("click", () => this.redo());
 
     // Bind keep playing button
     this.container.querySelector("#btn-2048-keep-playing")
@@ -509,6 +540,23 @@ export class Game2048Renderer {
 
   restart(): void {
     this.state = createGame();
+    this.history.clear();
+    this.render();
+  }
+
+  private undo(): void {
+    const previous = this.history.undo(this.state);
+    if (!previous) return;
+    this.state = previous;
+    playSfx("click");
+    this.render();
+  }
+
+  private redo(): void {
+    const next = this.history.redo(this.state);
+    if (!next) return;
+    this.state = next;
+    playSfx("click");
     this.render();
   }
 }

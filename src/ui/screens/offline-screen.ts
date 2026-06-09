@@ -52,6 +52,7 @@ export function renderOfflineScreen(container: HTMLElement): void {
 
     <section class="offline-section">
       <h2>Installed Games</h2>
+      <p class="settings-note">Download individual games for offline play, or download everything in one pass.</p>
       <div id="offline-game-list"></div>
     </section>
 
@@ -177,18 +178,14 @@ async function renderGameList(): Promise<void> {
     })
   );
 
-  const allNotDownloaded = allStatuses.every((status) => status === "not-downloaded");
-
-  if (allNotDownloaded) {
-    list.innerHTML = `
+  if (allStatuses.every((status) => status === "not-downloaded")) {
+    list.innerHTML += `
       <div class="empty-state">
-        <p class="empty-state__icon">📦</p>
+        <p class="empty-state__icon">!</p>
         <h3>No Games Downloaded</h3>
-        <p>Download games from the home screen to play offline.</p>
-        <a href="#/" class="btn btn--primary">Browse Games</a>
+        <p>Choose a game below to make it available offline.</p>
       </div>
     `;
-    return;
   }
 
   for (const game of games) {
@@ -202,7 +199,12 @@ async function renderGameList(): Promise<void> {
     downloadAllBtn.onclick = async () => {
       downloadAllBtn.disabled = true;
       downloadAllBtn.textContent = "Downloading...";
-      const { succeeded, failed } = await downloadAllSingleplayer();
+      const { succeeded, failed } = await downloadAllSingleplayer((progress) => {
+        if (progress.phase === "downloading" && progress.total > 0) {
+          const pct = Math.round((progress.loaded / progress.total) * 100);
+          downloadAllBtn.textContent = `Downloading ${progress.gameId} ${pct}%`;
+        }
+      });
       downloadAllBtn.textContent = `Done: ${succeeded.length} OK, ${failed.length} failed`;
       setTimeout(() => {
         renderGameList();

@@ -55,7 +55,15 @@ export function createActionButton(
         btn.textContent = "Downloading...";
         btn.disabled = true;
         try {
-          await downloadGame(game.id);
+          await downloadGame(game.id, (progress) => {
+            if (progress.phase === "downloading" && progress.total > 0) {
+              const pct = Math.round((progress.loaded / progress.total) * 100);
+              btn.textContent = `Downloading ${pct}%`;
+            }
+            if (progress.phase === "error") {
+              btn.textContent = "Failed — Retry";
+            }
+          });
           onStatusChange();
         } catch (err) {
           btn.textContent = "Failed — Retry";

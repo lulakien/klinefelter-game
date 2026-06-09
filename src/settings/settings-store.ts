@@ -53,6 +53,7 @@ function notify(): void {
   const snapshot = getSettings();
   document.documentElement.classList.toggle("reduced-motion", snapshot.reducedMotion);
   document.documentElement.classList.toggle("dark-mode", snapshot.darkMode);
+  applyQualityClass(snapshot.qualityMode);
   for (const fn of listeners) {
     fn(snapshot);
   }
@@ -62,6 +63,7 @@ function notify(): void {
 settings = load();
 document.documentElement.classList.toggle("reduced-motion", settings.reducedMotion);
 document.documentElement.classList.toggle("dark-mode", settings.darkMode);
+applyQualityClass(settings.qualityMode);
 
 /** Get a frozen snapshot of current settings. */
 export function getSettings(): AppSettings {
@@ -89,4 +91,9 @@ export function setQualityMode(mode: QualityMode): void {
 export function onSettingsChange(fn: SettingsListener): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
+}
+
+function applyQualityClass(mode: QualityMode): void {
+  document.documentElement.classList.toggle("quality-ultra-low", mode === "ultra-low");
+  document.documentElement.classList.toggle("quality-high", mode === "high-quality");
 }
