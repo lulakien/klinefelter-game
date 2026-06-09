@@ -80,4 +80,5 @@ export interface AppSettings {
   vibrationEnabled: boolean;
   manualUpdateChecksOnly: boolean;
   showEstimatedSizes: boolean;
+  darkMode: boolean;
 }

@@ -184,6 +184,7 @@ export class SnakeRenderer {
   private onKeyDown: (e: KeyboardEvent) => void;
   private onTouch: (e: TouchEvent) => void;
   private touchStart: Point | null = null;
+  private destroyed = false;
 
   constructor(state: SnakeState) {
     this.state = state;
@@ -258,6 +259,7 @@ export class SnakeRenderer {
   }
 
   destroy(): void {
+    this.destroyed = true;
     cancelAnimationFrame(this.animFrame);
     window.removeEventListener("keydown", this.onKeyDown);
     this.canvas.removeEventListener("touchstart", this.onTouch);
@@ -269,6 +271,7 @@ export class SnakeRenderer {
   }
 
   private tick(): void {
+    if (this.destroyed) return; // Stop loop if destroyed
     const now = performance.now();
     const dt = now - this.state.lastTimestamp;
     this.state.lastTimestamp = now;

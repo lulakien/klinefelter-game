@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { visualizer } from "rollup-plugin-visualizer";
 
 export default defineConfig({
   // GitHub Pages project site: https://lulakien.github.io/klinefelter-game/
@@ -11,9 +12,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes("games/car-arena/")) {
-            return "game-car-arena";
-          }
           if (id.includes("games/2048/")) {
             return "game-2048";
           }
@@ -96,6 +94,12 @@ export default defineConfig({
           },
         ],
       },
+    }),
+    visualizer({
+      open: false,
+      filename: 'dist/stats.html',
+      gzipSize: true,
+      brotliSize: true,
     }),
   ],
   server: {

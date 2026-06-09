@@ -177,10 +177,18 @@ async function updateGameCardStatus(gameId: string): Promise<void> {
   if (!statusEl) return;
 
   const card = statusEl.closest(".game-card") as HTMLElement | null;
+
+  // Add timeout to prevent hanging "Checking..." state
+  const timeoutId = setTimeout(() => {
+    statusEl.innerHTML = `<span class="status-badge status-badge--not-downloaded">Check Failed</span>`;
+  }, 3000);
+
   let status: GameOfflineStatus;
   try {
     status = await getGameOfflineStatus(gameId);
+    clearTimeout(timeoutId);
   } catch {
+    clearTimeout(timeoutId);
     status = "not-downloaded";
   }
   const swStatus = getSWStatus();

@@ -213,6 +213,7 @@ function aiMove(state: ConnectFourState): number {
 export class ConnectFourRenderer {
   private state: ConnectFourState;
   private container: HTMLElement | null = null;
+  private aiTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(state: ConnectFourState) {
     this.state = state;
@@ -224,6 +225,10 @@ export class ConnectFourRenderer {
   }
 
   destroy(): void {
+    if (this.aiTimeout) {
+      clearTimeout(this.aiTimeout);
+      this.aiTimeout = null;
+    }
     if (this.container) {
       this.container.innerHTML = "";
     }
@@ -240,12 +245,13 @@ export class ConnectFourRenderer {
     this.dropDisc(row, col);
 
     if (!this.state.gameOver && this.state.mode === "ai") {
-      setTimeout(() => {
+      this.aiTimeout = setTimeout(() => {
         const aiCol = aiMove(this.state);
         if (aiCol !== -1) {
           const aiRow = getLowestOpenRow(this.state.board, aiCol);
           if (aiRow !== -1) this.dropDisc(aiRow, aiCol);
         }
+        this.aiTimeout = null;
       }, 400);
     }
   }

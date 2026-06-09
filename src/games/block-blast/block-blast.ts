@@ -188,6 +188,7 @@ export class BlockBlastRenderer {
 
   private render(): void {
     if (!this.container) return;
+    this.endDrag(); // Clean up any active drag before re-rendering
     submitScore(this.state);
 
     this.container.innerHTML = `

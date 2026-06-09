@@ -12,7 +12,7 @@ function getAudioContext(): AudioContext {
   return audioCtx;
 }
 
-export type SfxType = "click" | "success" | "fail" | "hit" | "drift";
+export type SfxType = "click" | "success" | "fail" | "hit" | "swap" | "error" | "levelup";
 
 /** Play a synthesized sfx using the Web Audio API. */
 export function playSfx(type: SfxType): void {
@@ -75,15 +75,39 @@ export function playSfx(type: SfxType): void {
         osc.stop(now + 0.18);
         break;
 
-      case "drift":
-        // Subtle friction hum
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(90, now);
-        osc.frequency.linearRampToValueAtTime(140, now + 0.12);
-        gain.gain.setValueAtTime(0.04, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      case "swap":
+        // Tile swap sound - quick chirp
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(680, now + 0.06);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
         osc.start(now);
-        osc.stop(now + 0.12);
+        osc.stop(now + 0.06);
+        break;
+
+      case "error":
+        // Error buzz - harsh descending tone
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.linearRampToValueAtTime(90, now + 0.15);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.start(now);
+        osc.stop(now + 0.15);
+        break;
+
+      case "levelup":
+        // Achievement unlocked - ascending arpeggio
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(440, now); // A4
+        osc.frequency.setValueAtTime(554, now + 0.08); // C#5
+        osc.frequency.setValueAtTime(659, now + 0.16); // E5
+        osc.frequency.setValueAtTime(880, now + 0.24); // A5
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        osc.start(now);
+        osc.stop(now + 0.5);
         break;
     }
   } catch (err) {

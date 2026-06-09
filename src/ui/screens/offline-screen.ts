@@ -166,6 +166,31 @@ async function renderGameList(): Promise<void> {
   const games = getAllGames();
   list.innerHTML = "";
 
+  // Check if all games are not downloaded
+  const allStatuses = await Promise.all(
+    games.map(async (game) => {
+      try {
+        return await getGameOfflineStatus(game.id);
+      } catch {
+        return "not-downloaded";
+      }
+    })
+  );
+
+  const allNotDownloaded = allStatuses.every((status) => status === "not-downloaded");
+
+  if (allNotDownloaded) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <p class="empty-state__icon">📦</p>
+        <h3>No Games Downloaded</h3>
+        <p>Download games from the home screen to play offline.</p>
+        <a href="#/" class="btn btn--primary">Browse Games</a>
+      </div>
+    `;
+    return;
+  }
+
   for (const game of games) {
     const row = await createGameRow(game);
     list.appendChild(row);

@@ -89,6 +89,61 @@
   --glow-cyan: 0 0 0 4px rgba(35, 199, 244, 0.18);
 }
 
+/* ---- Dark Mode Palette ---- */
+
+:root.dark-mode {
+  /* Backgrounds */
+  --color-bg: #1a1625;
+  --color-bg-gradient:
+    radial-gradient(circle at 18% 12%, rgba(147, 51, 234, 0.15) 0 12%, transparent 13%),
+    radial-gradient(circle at 86% 18%, rgba(59, 130, 246, 0.12) 0 10%, transparent 11%),
+    linear-gradient(160deg, #2a2438 0%, #1f1a2e 55%, #1a1625 100%);
+
+  --color-surface: #2a2438;
+  --color-surface-hover: #352d45;
+  --color-surface-light: rgba(42, 36, 56, 0.55);
+
+  /* Borders */
+  --color-border: #4a3f5c;
+  --color-border-hover: #5e5270;
+  --color-border-glow: rgba(74, 63, 92, 0.22);
+
+  /* Text */
+  --color-text: #e5e0f0;
+  --color-text-muted: #9d93b3;
+
+  /* Accent Colors - slightly adjusted for dark mode */
+  --color-accent: #ff6b6b;
+  --color-accent-hover: #ff8585;
+
+  --color-cyan: #3dd9ff;
+  --color-cyan-rgb: 61, 217, 255;
+
+  --color-success: #4ade80;
+  --color-success-bg: rgba(74, 222, 128, 0.18);
+
+  --color-warning: #fbbf24;
+  --color-warning-bg: rgba(251, 191, 36, 0.24);
+
+  --color-danger: #ff6b6b;
+  --color-cocoa: #8b7a9f;
+  --color-cocoa-2: #9d8bb5;
+  --color-cream: #2a2438;
+  --color-peach: #2a2438;
+  --color-green: #86efac;
+
+  /* Buttons */
+  --color-btn-primary: linear-gradient(180deg, #3dd9ff 0%, #2bb8e6 100%);
+  --color-btn-primary-hover: linear-gradient(180deg, #60e4ff 0%, #3dd9ff 100%);
+  --color-btn-secondary: #2a2438;
+  --color-btn-secondary-hover: #352d45;
+
+  /* Shadows - softer in dark mode */
+  --shadow-premium: 0 10px 0 rgba(0, 0, 0, 0.3), 0 18px 28px rgba(0, 0, 0, 0.4);
+  --glow-accent: 0 0 0 4px rgba(255, 107, 107, 0.16);
+  --glow-cyan: 0 0 0 4px rgba(61, 217, 255, 0.18);
+}
+
 /* ---- Base & Global Styles ---- */
 
 html {
@@ -833,6 +888,36 @@ body::before {
 }
 
 .error-fallback p {
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-lg);
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+/* ---- Empty State ---- */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-xl);
+  min-height: 300px;
+}
+
+.empty-state__icon {
+  font-size: 4rem;
+  margin-bottom: var(--space-md);
+}
+
+.empty-state h3 {
+  color: var(--color-text);
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-xl);
+}
+
+.empty-state p {
   color: var(--color-text-muted);
   margin: 0 0 var(--space-lg);
   max-width: 320px;

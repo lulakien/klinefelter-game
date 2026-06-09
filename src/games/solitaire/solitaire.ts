@@ -441,6 +441,7 @@ export class SolitaireRenderer {
 
   private render(): void {
     if (!this.container) return;
+    this.endDrag(); // Clean up any active drag before re-rendering
     submitScore(this.state);
 
     const wrapper = document.createElement("div");

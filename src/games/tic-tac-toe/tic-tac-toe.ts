@@ -119,6 +119,7 @@ function aiMove(state: TicTacToeState): number {
 export class TicTacToeRenderer {
   private state: TicTacToeState;
   private container: HTMLElement | null = null;
+  private aiTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(state: TicTacToeState) {
     this.state = state;
@@ -130,6 +131,10 @@ export class TicTacToeRenderer {
   }
 
   destroy(): void {
+    if (this.aiTimeout) {
+      clearTimeout(this.aiTimeout);
+      this.aiTimeout = null;
+    }
     if (this.container) {
       this.container.innerHTML = "";
     }
@@ -143,9 +148,10 @@ export class TicTacToeRenderer {
     this.makeMove(index);
 
     if (!this.state.gameOver && this.state.mode === "ai") {
-      setTimeout(() => {
+      this.aiTimeout = setTimeout(() => {
         const move = aiMove(this.state);
         if (move !== -1) this.makeMove(move);
+        this.aiTimeout = null;
       }, 350);
     }
   }

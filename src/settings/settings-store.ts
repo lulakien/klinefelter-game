@@ -20,6 +20,7 @@ const DEFAULTS: AppSettings = {
   vibrationEnabled: false,
   manualUpdateChecksOnly: true,
   showEstimatedSizes: true,
+  darkMode: false,
 };
 
 type SettingsListener = (settings: AppSettings) => void;
@@ -51,6 +52,7 @@ function save(): void {
 function notify(): void {
   const snapshot = getSettings();
   document.documentElement.classList.toggle("reduced-motion", snapshot.reducedMotion);
+  document.documentElement.classList.toggle("dark-mode", snapshot.darkMode);
   for (const fn of listeners) {
     fn(snapshot);
   }
@@ -59,6 +61,7 @@ function notify(): void {
 // Initialize
 settings = load();
 document.documentElement.classList.toggle("reduced-motion", settings.reducedMotion);
+document.documentElement.classList.toggle("dark-mode", settings.darkMode);
 
 /** Get a frozen snapshot of current settings. */
 export function getSettings(): AppSettings {

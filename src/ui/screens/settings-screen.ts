@@ -1,4 +1,5 @@
 import { getSettings, updateSettings } from "../../settings/settings-store.js";
+import { exportErrorLogs, getErrorCount, clearErrorLogs } from "../../core/error-logger.js";
 import type { QualityMode } from "../../shared/game-types.js";
 
 /**
@@ -35,6 +36,14 @@ export function renderSettingsScreen(container: HTMLElement): void {
     </section>
 
     <section class="settings-section">
+      <h2>Appearance</h2>
+      <label class="setting-row">
+        <span>Dark Mode</span>
+        <input type="checkbox" id="setting-dark-mode" ${settings.darkMode ? "checked" : ""} />
+      </label>
+    </section>
+
+    <section class="settings-section">
       <h2>Audio</h2>
       <label class="setting-row">
         <span>Sound Effects</span>
@@ -67,6 +76,7 @@ export function renderSettingsScreen(container: HTMLElement): void {
     </section>
 
     <div class="settings-actions">
+      <button class="btn btn--secondary" id="btn-export-errors" style="margin-right: 8px;">Report Bug</button>
       <a class="btn btn--secondary" href="#/">Back to Home</a>
     </div>
   `;
@@ -108,11 +118,38 @@ function bindSettingsEvents(): void {
   }
 
   // Checkbox bindings
+  bindCheckbox("setting-dark-mode", "darkMode");
   bindCheckbox("setting-sfx", "soundEffectsEnabled");
   bindCheckbox("setting-music", "musicEnabled");
   bindCheckbox("setting-sizes", "showEstimatedSizes");
   bindCheckbox("setting-manual-updates", "manualUpdateChecksOnly");
   bindCheckbox("setting-reduced-motion", "reducedMotion");
+
+  // Export errors button
+  const exportBtn = document.getElementById("btn-export-errors") as HTMLButtonElement | null;
+  if (exportBtn) {
+    const errorCount = getErrorCount();
+    if (errorCount > 0) {
+      exportBtn.textContent = `Report Bug (${errorCount} errors)`;
+    }
+
+    exportBtn.addEventListener("click", () => {
+      const logs = exportErrorLogs();
+      const blob = new Blob([logs], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `klinefelter-errors-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      // Ask if user wants to clear logs after export
+      if (confirm("Error log exported. Clear the error log?")) {
+        clearErrorLogs();
+        exportBtn.textContent = "Report Bug";
+      }
+    });
+  }
 }
 
 function bindCheckbox(id: string, key: string): void {
