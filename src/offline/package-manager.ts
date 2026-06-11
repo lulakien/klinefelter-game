@@ -83,7 +83,9 @@ async function isGameInCache(gameId: string): Promise<boolean> {
   try {
     const cache = await caches.open(GAME_CACHE_NAME);
     const keys = await cache.keys();
-    return keys.some((req) => req.url.includes(gameId));
+    const escapedGameId = gameId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`/game-${escapedGameId}-[^/]+\\.js$`);
+    return keys.some((req) => pattern.test(req.url));
   } catch {
     return false;
   }
@@ -98,7 +100,9 @@ async function getGameCacheEntries(
   try {
     const cache = await caches.open(GAME_CACHE_NAME);
     const keys = await cache.keys();
-    return keys.filter((req) => req.url.includes(gameId));
+    const escapedGameId = gameId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`/game-${escapedGameId}-[^/]+\\.js$`);
+    return keys.filter((req) => pattern.test(req.url));
   } catch {
     return [];
   }
@@ -138,18 +142,25 @@ export async function getGameOfflineStatus(
   if (game.offlineSupport === "none") return "online-only";
 
   const record = await getRecord(gameId);
+
+  // Check cache before version checks so stale IndexedDB records cannot mask missing cache entries.
   const cached = await isGameInCache(gameId);
 
-  if (!record && !cached) return "not-downloaded";
-  if (record && !cached) return "storage-removed";
+  if (!cached) {
+    // No cache means not downloaded, clean up any stale record
+    await deleteRecord(gameId);
+    return record ? "storage-removed" : "not-downloaded";
+  }
 
-  if (record && record.installedVersion !== game.version) {
+  // Cache exists but no record - storage was removed partially
+  if (!record) return "storage-removed";
+
+  // Check for updates
+  if (record.installedVersion !== game.version) {
     return "update-available";
   }
 
-  if (cached) return "offline-ready";
-
-  return "not-downloaded";
+  return "offline-ready";
 }
 
 /** Get offline status for all games. */

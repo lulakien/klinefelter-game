@@ -7,7 +7,7 @@ export default defineConfig({
   // Change to "/" if using a custom domain
   base: "/klinefelter-game/",
   build: {
-    target: "ES2022",
+    target: ["chrome90", "firefox88", "safari14", "edge90"],
     sourcemap: false,
     rollupOptions: {
       output: {

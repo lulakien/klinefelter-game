@@ -1,4 +1,5 @@
 import { getSettings } from "./settings-store.js";
+import { logError } from "../core/error-logger.js";
 
 export interface ScoreRecord {
   gameId: string;
@@ -65,7 +66,12 @@ export function saveScore(gameId: string, score: number, formattedScore?: string
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(allScores));
     return true;
-  } catch {
+  } catch (error) {
+    const isQuota = (error as any)?.name === "QuotaExceededError";
+    logError(
+      error instanceof Error ? error : new Error("Score save failed"),
+      `scores-store.save gameId=${gameId}${isQuota ? " [QuotaExceededError]" : ""}`
+    );
     return false;
   }
 }

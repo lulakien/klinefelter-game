@@ -1,4 +1,6 @@
 import type { RouteState } from "../shared/game-types.js";
+import { logError } from "../core/error-logger.js";
+import { renderOfflineScreen } from "../ui/screens/offline-screen.js";
 
 /**
  * Simple hash-based client-side router.
@@ -104,8 +106,32 @@ function handleRoute(): void {
 
 /** Start listening for route changes. */
 export function startRouter(): void {
-  window.addEventListener("hashchange", handleRoute);
-  handleRoute();
+  window.addEventListener("hashchange", () => {
+    try {
+      handleRoute();
+    } catch (error) {
+      logError(
+        error instanceof Error ? error : new Error("Route handler failed"),
+        `router:hashchange:${window.location.hash}`
+      );
+      const appContainer = document.getElementById("app");
+      if (appContainer) {
+        renderOfflineScreen(appContainer);
+      }
+    }
+  });
+  try {
+    handleRoute();
+  } catch (error) {
+    logError(
+      error instanceof Error ? error : new Error("Initial route handler failed"),
+      `router:initial:${window.location.hash}`
+    );
+    const appContainer = document.getElementById("app");
+    if (appContainer) {
+      renderOfflineScreen(appContainer);
+    }
+  }
 }
 
 /** Get the current route state (read-only snapshot). */

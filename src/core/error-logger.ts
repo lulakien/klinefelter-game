@@ -79,11 +79,25 @@ export function clearErrorLogs(): void {
 /** Export error logs as JSON string */
 export function exportErrorLogs(): string {
   const logs = getErrorLogs();
+  const sanitizeStack = (stack?: string) =>
+    stack
+      ?.split("\n")
+      .map((line) =>
+        line
+          .replace(/https?:\/\/\S+/g, "[URL]")
+          .replace(/\b[A-Za-z]:[\\/][^\s)]+/g, "[PATH]")
+          .replace(/\/[^\s)]+/g, "[PATH]")
+      )
+      .join("\n");
+
   return JSON.stringify(
     {
       exportedAt: new Date().toISOString(),
       totalErrors: logs.length,
-      errors: logs,
+      errors: logs.map((log) => ({
+        ...log,
+        stack: sanitizeStack(log.stack),
+      })),
     },
     null,
     2

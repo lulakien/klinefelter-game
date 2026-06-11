@@ -204,9 +204,9 @@ function createGameCard(game: GameMeta): HTMLElement {
     .join(" + ");
 
   const pb = getPersonalBest(game.id);
-  const pbLabel = pb ? `PB: ${pb.formattedScore || pb.score}` : "PB: None";
+  const pbLabel = pb ? `PB: ${escapeHtml(pb.formattedScore || String(pb.score))}` : "PB: None";
   const pbTitle = pb
-    ? `Best by ${pb.nickname}${pb.date ? ` on ${new Date(pb.date).toLocaleDateString()}` : ""}`
+    ? `Best by ${escapeHtml(pb.nickname)}${pb.date ? ` on ${new Date(pb.date).toLocaleDateString()}` : ""}`
     : "No personal best yet";
 
   card.innerHTML = `
@@ -219,7 +219,7 @@ function createGameCard(game: GameMeta): HTMLElement {
       <span>${offlineLabel}</span>
       ${settings.showEstimatedSizes ? `<span>Size: ${sizeLabel}</span>` : ""}
       <span>Controls: ${controlsLabel}</span>
-      <span class="game-card__pb" title="${escapeHtml(pbTitle)}">${escapeHtml(pbLabel)}</span>
+      <span class="game-card__pb" title="${escapeHtml(pbTitle)}">${pbLabel}</span>
     </div>
     <div class="game-card__status" id="card-status-${game.id}">
       <span class="status-badge status-badge--not-downloaded">Checking...</span>

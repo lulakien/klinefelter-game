@@ -89,6 +89,7 @@ export class Puzzle15Renderer {
   private container: HTMLElement | null = null;
   private state: Puzzle15State;
   private timerInterval: ReturnType<typeof setInterval> | null = null;
+  private animationTimeout: ReturnType<typeof setTimeout> | null = null;
   private swipeStart: { index: number; x: number; y: number; pointerId: number } | null = null;
   private suppressClickIndex: number | null = null;
   private animating = false;
@@ -129,6 +130,10 @@ export class Puzzle15Renderer {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
+    }
+    if (this.animationTimeout) {
+      clearTimeout(this.animationTimeout);
+      this.animationTimeout = null;
     }
     if (this.container) this.container.innerHTML = "";
     this.container = null;
@@ -359,13 +364,14 @@ export class Puzzle15Renderer {
     movingTile.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
     movingTile.style.zIndex = "10";
 
-    setTimeout(() => {
+    this.animationTimeout = setTimeout(() => {
       if (movingTile) {
         movingTile.style.transition = "";
         movingTile.style.transform = "";
         movingTile.style.zIndex = "";
       }
       this.animating = false;
+      this.animationTimeout = null;
       onComplete();
     }, 180);
   }

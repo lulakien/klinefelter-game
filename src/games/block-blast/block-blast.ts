@@ -155,6 +155,8 @@ interface DragState {
   anchorOffsetRow: number;
   anchorOffsetCol: number;
   liftY: number;
+  pointerId: number;
+  captureElement: HTMLElement;
 }
 
 export class BlockBlastRenderer {
@@ -324,7 +326,7 @@ export class BlockBlastRenderer {
     ghost.appendChild(shapeGrid);
     document.body.appendChild(ghost);
 
-    this.drag = { shapeIndex, ghost, offsetX, offsetY, anchorOffsetRow, anchorOffsetCol, liftY };
+    this.drag = { shapeIndex, ghost, offsetX, offsetY, anchorOffsetRow, anchorOffsetCol, liftY, pointerId: e.pointerId, captureElement: el };
     el.setPointerCapture(e.pointerId);
 
     window.addEventListener("pointermove", this.boundOnMove);
@@ -370,6 +372,9 @@ export class BlockBlastRenderer {
     window.removeEventListener("pointermove", this.boundOnMove);
     window.removeEventListener("pointerup", this.boundOnUp);
     if (this.drag) {
+      try {
+        this.drag.captureElement.releasePointerCapture(this.drag.pointerId);
+      } catch {}
       this.drag.ghost.remove();
       this.drag = null;
     }

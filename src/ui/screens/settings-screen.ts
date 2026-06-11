@@ -151,6 +151,10 @@ function bindSettingsEvents(): void {
     }
 
     exportBtn.addEventListener("click", () => {
+      if (!confirm("Error logs may contain technical information about your device and browsing session. Continue export?")) {
+        return;
+      }
+
       const logs = exportErrorLogs();
       const blob = new Blob([logs], { type: "application/json" });
       const url = URL.createObjectURL(blob);

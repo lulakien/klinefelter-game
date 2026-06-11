@@ -5,6 +5,8 @@
  * and restoring on mount with user confirmation.
  */
 
+import { logError } from "./error-logger.js";
+
 const SAVE_PREFIX = "klinefelter-save-";
 const SAVE_EXPIRY_DAYS = 7;
 
@@ -15,16 +17,31 @@ export interface GameSave<T = any> {
   version: string;
 }
 
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function isSafeJsonValue(value: unknown): boolean {
+  if (!value || typeof value !== "object") return true;
+  if (Array.isArray(value)) return value.every(isSafeJsonValue);
+  if (Object.getPrototypeOf(value) !== Object.prototype) return false;
+
+  return Object.entries(value).every(([key, child]) => (
+    !UNSAFE_KEYS.has(key) && isSafeJsonValue(child)
+  ));
+}
+
 function isSaveRecord<T>(value: unknown, gameId: string): value is GameSave<T> {
   if (!value || typeof value !== "object") return false;
+  if (!isSafeJsonValue(value)) return false;
   const record = value as Partial<GameSave<T>>;
-  return (
+  if (!(
     record.gameId === gameId &&
     typeof record.timestamp === "number" &&
     Number.isFinite(record.timestamp) &&
     typeof record.version === "string" &&
     "state" in record
-  );
+  )) return false;
+
+  return true;
 }
 
 /** Save game state to localStorage */
@@ -39,7 +56,11 @@ export function saveGameState<T>(gameId: string, state: T, version: string = "1.
 
     localStorage.setItem(SAVE_PREFIX + gameId, JSON.stringify(save));
   } catch (error) {
-    console.warn("Failed to save game state:", error);
+    const isQuota = (error as any)?.name === "QuotaExceededError";
+    logError(
+      error instanceof Error ? error : new Error("Game save failed"),
+      `game-save-manager.saveGameState gameId=${gameId}${isQuota ? " [QuotaExceededError]" : ""}`
+    );
   }
 }
 
@@ -49,11 +70,12 @@ export function loadGameState<T>(gameId: string): GameSave<T> | null {
     const raw = localStorage.getItem(SAVE_PREFIX + gameId);
     if (!raw) return null;
 
-    const save = JSON.parse(raw);
-    if (!isSaveRecord<T>(save, gameId)) {
+    const parsed = JSON.parse(raw);
+    if (!isSaveRecord<T>(parsed, gameId)) {
       clearGameState(gameId);
       return null;
     }
+    const save = JSON.parse(JSON.stringify(parsed));
 
     // Check if save is expired (7 days)
     const age = Date.now() - save.timestamp;
@@ -105,6 +127,8 @@ export class AutoSaveManager<T> {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private gameId: string;
   private version: string;
+  private errorCount = 0;
+  private readonly MAX_ERRORS = 5;
 
   constructor(gameId: string, version: string = "1.0.0") {
     this.gameId = gameId;
@@ -120,11 +144,23 @@ export class AutoSaveManager<T> {
     this.stop(); // Clear any existing interval
 
     this.intervalId = setInterval(() => {
-      const state = getState();
-      if (shouldSave(state)) {
-        saveGameState(this.gameId, state, this.version);
-      } else {
-        clearGameState(this.gameId);
+      try {
+        const state = getState();
+        if (shouldSave(state)) {
+          saveGameState(this.gameId, state, this.version);
+        } else {
+          clearGameState(this.gameId);
+        }
+        this.errorCount = 0;
+      } catch (error) {
+        this.errorCount++;
+        logError(
+          error instanceof Error ? error : new Error("AutoSave failed"),
+          `AutoSaveManager gameId=${this.gameId} errorCount=${this.errorCount}`
+        );
+        if (this.errorCount >= this.MAX_ERRORS) {
+          this.stop();
+        }
       }
     }, intervalSeconds * 1000);
   }

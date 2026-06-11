@@ -1,4 +1,5 @@
 import type { AppSettings, QualityMode } from "../shared/game-types.js";
+import { logError } from "../core/error-logger.js";
 
 /**
  * Simple settings store backed by localStorage.
@@ -33,7 +34,16 @@ function load(): AppSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return { ...DEFAULTS, ...parsed };
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Object.getPrototypeOf(parsed) === Object.prototype) {
+        const safe = Object.keys(DEFAULTS).reduce((acc, key) => {
+          const typedKey = key as keyof AppSettings;
+          if (key in parsed && typeof parsed[key] === typeof DEFAULTS[typedKey]) {
+            acc[typedKey] = parsed[key];
+          }
+          return acc;
+        }, {} as Partial<AppSettings>);
+        return { ...DEFAULTS, ...safe };
+      }
     }
   } catch {
     // Corrupt storage — fall through to defaults
@@ -44,8 +54,12 @@ function load(): AppSettings {
 function save(): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // Storage full or unavailable — silently ignore
+  } catch (error) {
+    const isQuota = (error as any)?.name === "QuotaExceededError";
+    logError(
+      error instanceof Error ? error : new Error("Settings save failed"),
+      `settings-store.save${isQuota ? " [QuotaExceededError]" : ""}`
+    );
   }
 }
 

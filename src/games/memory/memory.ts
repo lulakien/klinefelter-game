@@ -191,6 +191,7 @@ export class MemoryRenderer {
       const b = state.secondPick;
       this.flipTimeout = setTimeout(() => {
         this.flipTimeout = null;
+        if (!this.container) return;
         state.cards[a].flipped = false;
         state.cards[b].flipped = false;
         state.firstPick = null;
@@ -212,7 +213,7 @@ export class MemoryRenderer {
   }
 
   private updateAllCards(state: MemoryState): void {
-    if (!this.container) return;
+    if (!this.container || !this.container.isConnected) return;
     const cells = this.container.querySelectorAll(".memory__card");
     cells.forEach((cell, i) => {
       const card = state.cards[i];

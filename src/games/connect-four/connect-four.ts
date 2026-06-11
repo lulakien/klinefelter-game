@@ -250,6 +250,7 @@ export class ConnectFourRenderer {
 
     if (!this.state.gameOver && this.state.mode === "ai") {
       this.aiTimeout = setTimeout(() => {
+        if (!this.container) return;
         const aiCol = aiMove(this.state);
         if (aiCol !== -1) {
           const aiRow = getLowestOpenRow(this.state.board, aiCol);
@@ -322,7 +323,7 @@ export class ConnectFourRenderer {
   }
 
   private render(): void {
-    if (!this.container) return;
+    if (!this.container || !this.container.isConnected) return;
 
     const { board, currentPlayer, winner, draw, gameOver, mode, difficulty, scores, winningLine } = this.state;
 

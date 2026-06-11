@@ -13,6 +13,7 @@ export interface StatsSnapshot {
 }
 
 const STORAGE_KEY = "klinefelter-stats";
+const MAX_GAMES = 100;
 
 function parseStats(raw: string | null): GameStatsRecord[] {
   if (!raw) return [];
@@ -66,6 +67,13 @@ export function recordGameStarted(gameId: string): void {
       lastPlayed: Date.now(),
     });
   }
+
+  // Cleanup: remove oldest games if exceeding MAX_GAMES
+  if (records.length > MAX_GAMES) {
+    const sortedByOldest = records.sort((a, b) => a.lastPlayed - b.lastPlayed);
+    sortedByOldest.splice(0, records.length - MAX_GAMES);
+  }
+
   writeStats(records);
 }
 

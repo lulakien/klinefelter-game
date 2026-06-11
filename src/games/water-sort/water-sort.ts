@@ -326,6 +326,7 @@ export class WaterSortRenderer {
 
     this.pouringTimer = setTimeout(() => {
       this.pouringTimer = null;
+      if (!this.container) return;
       onComplete();
     }, 220);
   }
@@ -341,7 +342,7 @@ export class WaterSortRenderer {
   }
 
   private render(): void {
-    if (!this.container) return;
+    if (!this.container || !this.container.isConnected) return;
     submitScore(this.state);
 
     const wrapper = document.createElement("div");

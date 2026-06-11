@@ -21,6 +21,25 @@ describe("error-logger", () => {
     expect(JSON.parse(exportErrorLogs()).totalErrors).toBe(1);
   });
 
+  it("sanitizes URLs and local paths from exported stacks", () => {
+    const error = new Error("private stack");
+    error.stack = [
+      "Error: private stack",
+      "    at run (https://example.com/klinefelter-game/assets/app.js:10:20)",
+      "    at local (/home/eren/Desktop/code-projects/klinefelter-game/src/main.ts:5:1)",
+      "    at win (C:\\Users\\Eren\\project\\src\\main.ts:6:2)",
+    ].join("\n");
+
+    logError(error, "sanitize-test");
+    const exported = exportErrorLogs();
+
+    expect(exported).not.toContain("example.com");
+    expect(exported).not.toContain("/home/eren");
+    expect(exported).not.toContain("C:\\Users");
+    expect(exported).toContain("[URL]");
+    expect(exported).toContain("[PATH]");
+  });
+
   it("ignores corrupt storage", () => {
     localStorage.setItem("klinefelter-errors", "{nope");
 

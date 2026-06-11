@@ -153,6 +153,7 @@ export class TicTacToeRenderer {
 
     if (!this.state.gameOver && this.state.mode === "ai") {
       this.aiTimeout = setTimeout(() => {
+        if (!this.container) return;
         const move = aiMove(this.state);
         if (move !== -1) this.makeMove(move);
         this.aiTimeout = null;
@@ -221,7 +222,7 @@ export class TicTacToeRenderer {
   }
 
   private render(): void {
-    if (!this.container) return;
+    if (!this.container || !this.container.isConnected) return;
 
     const { board, currentPlayer, winner, draw, gameOver, mode, difficulty, scores } = this.state;
 

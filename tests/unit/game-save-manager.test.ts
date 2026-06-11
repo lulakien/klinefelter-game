@@ -30,6 +30,23 @@ describe("game-save-manager", () => {
     expect(localStorage.getItem("klinefelter-save-snake")).toBeNull();
   });
 
+  it("rejects nested prototype pollution keys in saved state", () => {
+    localStorage.setItem(
+      "klinefelter-save-snake",
+      JSON.stringify({
+        gameId: "snake",
+        timestamp: Date.now(),
+        version: "1",
+        state: {
+          board: [{ score: 1, constructor: { prototype: { polluted: true } } }],
+        },
+      }),
+    );
+
+    expect(loadGameState("snake")).toBeNull();
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
   it("expires saves older than seven days", () => {
     const old = Date.now() - 8 * 24 * 60 * 60 * 1000;
     localStorage.setItem(
@@ -53,6 +70,26 @@ describe("game-save-manager", () => {
     state = { score: 20, gameOver: true };
     vi.advanceTimersByTime(5000);
     expect(loadGameState("snake")).toBeNull();
+
+    manager.stop();
+  });
+
+  it("keeps auto-saving after a transient getState error", () => {
+    vi.useFakeTimers();
+    const manager = new AutoSaveManager<{ score: number }>("snake");
+    let calls = 0;
+
+    manager.start(() => {
+      calls++;
+      if (calls === 1) throw new Error("temporary failure");
+      return { score: 42 };
+    }, 5);
+
+    vi.advanceTimersByTime(5000);
+    expect(loadGameState("snake")).toBeNull();
+
+    vi.advanceTimersByTime(5000);
+    expect(loadGameState<{ score: number }>("snake")?.state.score).toBe(42);
 
     manager.stop();
   });

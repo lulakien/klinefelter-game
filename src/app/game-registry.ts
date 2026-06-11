@@ -10,12 +10,14 @@ import type { GameMeta } from "../shared/game-types.js";
  * Game code must only be loaded when the user navigates to a game route.
  */
 
+const GAME_VERSION = "0.1.0";
+
 const registry: GameMeta[] = [
   {
     id: "2048",
     name: "2048",
     description: "Slide and merge tiles to reach 2048.",
-    version: "0.1.0",
+    version: GAME_VERSION,
     offlineSupport: "full",
     multiplayerSupport: "none",
     estimatedSizeLow: 150_000, // ~150 KB
@@ -31,7 +33,7 @@ const registry: GameMeta[] = [
     id: "minesweeper",
     name: "Minesweeper",
     description: "Classic mine-clearing puzzle. Flag all the mines!",
-    version: "0.1.0",
+    version: GAME_VERSION,
     offlineSupport: "full",
     multiplayerSupport: "none",
     estimatedSizeLow: 80_000, // ~80 KB
@@ -47,7 +49,7 @@ const registry: GameMeta[] = [
     id: "solitaire",
     name: "Solitaire",
     description: "Klondike solitaire with draw-one stock, tableau stacks, and ace-to-king foundations.",
-    version: "0.1.0",
+    version: GAME_VERSION,
     offlineSupport: "full",
     multiplayerSupport: "none",
     estimatedSizeLow: 90_000,
@@ -63,7 +65,7 @@ const registry: GameMeta[] = [
     id: "water-sort",
     name: "Water Sort",
     description: "Tap tubes to pour colors, using empty space to sort each tube into a single color.",
-    version: "0.1.0",
+    version: GAME_VERSION,
     offlineSupport: "full",
     multiplayerSupport: "none",
     estimatedSizeLow: 70_000,
@@ -79,7 +81,7 @@ const registry: GameMeta[] = [
     id: "block-blast",
     name: "Block Blast",
     description: "Place three block shapes on an 8x8 board and clear complete rows or columns.",
-    version: "0.1.0",
+    version: GAME_VERSION,
     offlineSupport: "full",
     multiplayerSupport: "none",
     estimatedSizeLow: 80_000,
@@ -95,7 +97,7 @@ const registry: GameMeta[] = [
     id: "snake",
     name: "Snake",
     description: "Classic snake — eat food, grow longer, avoid walls and yourself!",
-    version: "0.1.0",
+    version: GAME_VERSION,
     offlineSupport: "full",
     multiplayerSupport: "none",
     estimatedSizeLow: 60_000,
@@ -111,7 +113,7 @@ const registry: GameMeta[] = [
     id: "memory",
     name: "Memory",
     description: "Flip cards to find matching pairs. How few moves can you win in?",
-    version: "0.1.0",
+    version: GAME_VERSION,
     offlineSupport: "full",
     multiplayerSupport: "none",
     estimatedSizeLow: 50_000,
@@ -127,7 +129,7 @@ const registry: GameMeta[] = [
     id: "15-puzzle",
     name: "15 Puzzle",
     description: "Slide numbered image tiles into order on a classic 4x4 board.",
-    version: "0.1.0",
+    version: GAME_VERSION,
     offlineSupport: "full",
     multiplayerSupport: "none",
     estimatedSizeLow: 60_000,
@@ -143,7 +145,7 @@ const registry: GameMeta[] = [
     id: "tic-tac-toe",
     name: "Tic-Tac-Toe",
     description: "Classic X and O. Play with a friend or challenge the AI.",
-    version: "0.1.0",
+    version: GAME_VERSION,
     offlineSupport: "full",
     multiplayerSupport: "same-device",
     estimatedSizeLow: 30_000,
@@ -159,7 +161,7 @@ const registry: GameMeta[] = [
     id: "connect-four",
     name: "Connect Four",
     description: "Drop discs to connect four in a row. Same-device or vs AI.",
-    version: "0.1.0",
+    version: GAME_VERSION,
     offlineSupport: "full",
     multiplayerSupport: "same-device",
     estimatedSizeLow: 35_000,
