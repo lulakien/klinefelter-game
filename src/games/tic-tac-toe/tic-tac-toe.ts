@@ -265,8 +265,7 @@ export class TicTacToeRenderer {
           ${board.map((cell, i) => {
             const won = this.state.winningLine.includes(i);
             return `<button class="tic-tac-toe__cell ${cell ? `tic-tac-toe__cell--${cell.toLowerCase()}` : ""} ${gameOver ? "tic-tac-toe__cell--disabled" : ""} ${won ? "tic-tac-toe__cell--win" : ""}"
-                    data-index="${i}" ${cell || gameOver ? "disabled" : ""}>
-              ${cell}
+                    data-index="${i}" ${cell || gameOver ? "disabled" : ""} aria-label="${cell || 'Empty'}">
             </button>`;
           }).join("")}
         </div>

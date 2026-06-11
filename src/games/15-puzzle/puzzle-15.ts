@@ -104,6 +104,9 @@ export class Puzzle15Renderer {
     } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
       event.preventDefault();
       this.redo();
+    } else if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+      event.preventDefault();
+      this.handleArrowKey(event.key);
     }
   };
 
@@ -136,6 +139,31 @@ export class Puzzle15Renderer {
     this.state = createPuzzle15Game();
     this.history.clear();
     this.render();
+  }
+
+  private handleArrowKey(key: string): void {
+    if (this.state.won || this.animating) return;
+    const emptyIndex = this.state.tiles.indexOf(EMPTY);
+    const row = Math.floor(emptyIndex / SIZE);
+    const col = emptyIndex % SIZE;
+
+    let targetIndex = -1;
+
+    // Arrow keys move the tile INTO the empty space
+    // So ArrowUp moves the tile below the empty space up
+    if (key === "ArrowUp" && row < SIZE - 1) {
+      targetIndex = emptyIndex + SIZE; // tile below
+    } else if (key === "ArrowDown" && row > 0) {
+      targetIndex = emptyIndex - SIZE; // tile above
+    } else if (key === "ArrowLeft" && col < SIZE - 1) {
+      targetIndex = emptyIndex + 1; // tile to the right
+    } else if (key === "ArrowRight" && col > 0) {
+      targetIndex = emptyIndex - 1; // tile to the left
+    }
+
+    if (targetIndex >= 0 && targetIndex < TILE_COUNT) {
+      this.moveTile(targetIndex);
+    }
   }
 
   private moveTile(index: number): void {
@@ -193,7 +221,7 @@ export class Puzzle15Renderer {
         </div>
         <div class="puzzle-actions">
           <button class="btn btn--secondary" id="p15-undo" ${this.history.canUndo() ? "" : "disabled"}>Undo</button>
-          <button class="btn btn--secondary" id="p15-redo" ${this.history.canRedo() ? "" : "disabled"}>Redo</button>
+          <button class="btn btn--secondary btn--compact" id="p15-redo" ${this.history.canRedo() ? "" : "disabled"} title="Redo (Ctrl+Shift+Z or Ctrl+Y)">↻</button>
           <button class="btn btn--secondary" id="p15-restart">New Game</button>
           <a class="btn btn--secondary" href="#/">Back to Home</a>
         </div>

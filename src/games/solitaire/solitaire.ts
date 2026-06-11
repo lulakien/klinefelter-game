@@ -165,12 +165,20 @@ export class SolitaireRenderer {
     offsetX: number;
     offsetY: number;
   } | null = null;
+  private pendingDrag: {
+    selection: Selection;
+    el: HTMLElement;
+    startX: number;
+    startY: number;
+    pointerId: number;
+  } | null = null;
   private boundOnMove: (e: PointerEvent) => void;
   private boundOnUp: (e: PointerEvent) => void;
   private animatingWasteCardId: string | null = null;
   private timerInterval: ReturnType<typeof setInterval> | null = null;
   private lastTap: { key: string; at: number } | null = null;
   private history = new HistoryManager<SolitaireState>(50);
+  private readonly DRAG_THRESHOLD = 8;
   private onKeyDown = (event: KeyboardEvent) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
       event.preventDefault();
@@ -205,6 +213,7 @@ export class SolitaireRenderer {
 
   destroy(): void {
     this.endDrag();
+    this.cancelPendingDrag();
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
@@ -397,6 +406,29 @@ export class SolitaireRenderer {
 
   // ---- Drag support ----
 
+  private initiatePendingDrag(e: PointerEvent, selection: Selection, el: HTMLElement): void {
+    if (this.state.won) return;
+    const cards = getSelectionCards(this.state, selection);
+    if (!cards.length || !cards[0].faceUp) return;
+
+    this.pendingDrag = {
+      selection,
+      el,
+      startX: e.clientX,
+      startY: e.clientY,
+      pointerId: e.pointerId,
+    };
+
+    window.addEventListener("pointermove", this.boundOnMove);
+    window.addEventListener("pointerup", this.boundOnUp);
+  }
+
+  private cancelPendingDrag(): void {
+    if (this.pendingDrag) {
+      this.pendingDrag = null;
+    }
+  }
+
   private startDrag(e: PointerEvent, selection: Selection, el: HTMLElement): void {
     if (this.state.won) return;
     const cards = getSelectionCards(this.state, selection);
@@ -434,6 +466,28 @@ export class SolitaireRenderer {
   }
 
   private onPointerMove(e: PointerEvent): void {
+    // Check if we should convert pending drag to actual drag
+    if (this.pendingDrag && !this.drag) {
+      const dx = e.clientX - this.pendingDrag.startX;
+      const dy = e.clientY - this.pendingDrag.startY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance > this.DRAG_THRESHOLD) {
+        const { selection, el, startX, startY } = this.pendingDrag;
+        this.pendingDrag = null;
+
+        // Create the drag event from the original position
+        const syntheticEvent = new PointerEvent("pointerdown", {
+          clientX: startX,
+          clientY: startY,
+          pointerId: e.pointerId,
+          bubbles: true,
+        });
+        this.startDrag(syntheticEvent, selection, el);
+      }
+      return;
+    }
+
     if (!this.drag) return;
     e.preventDefault();
     const { ghost, offsetX, offsetY } = this.drag;
@@ -442,6 +496,16 @@ export class SolitaireRenderer {
   }
 
   private onPointerUp(e: PointerEvent): void {
+    // Handle pending drag that didn't become actual drag (tap/click)
+    if (this.pendingDrag && !this.drag) {
+      const selection = this.pendingDrag.selection;
+      this.cancelPendingDrag();
+      window.removeEventListener("pointermove", this.boundOnMove);
+      window.removeEventListener("pointerup", this.boundOnUp);
+      this.tapCard(selection);
+      return;
+    }
+
     if (!this.drag) return;
     e.preventDefault();
 
@@ -503,6 +567,7 @@ export class SolitaireRenderer {
       this.drag.ghost.remove();
       this.drag = null;
     }
+    this.cancelPendingDrag();
   }
 
   // ---- Rendering ----
@@ -557,7 +622,7 @@ export class SolitaireRenderer {
       }
       wEl.addEventListener("click", () => this.tapCard({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
       wEl.addEventListener("dblclick", () => this.autoFoundation({ zone: "waste", pile: 0, index: this.state.waste.length - 1 }));
-      wEl.addEventListener("pointerdown", (e) => this.startDrag(e, { zone: "waste", pile: 0, index: this.state.waste.length - 1 }, wEl));
+      wEl.addEventListener("pointerdown", (e) => this.initiatePendingDrag(e, { zone: "waste", pile: 0, index: this.state.waste.length - 1 }, wEl));
       wastePile.appendChild(wEl);
     } else {
       const empty = document.createElement("div");
@@ -580,7 +645,7 @@ export class SolitaireRenderer {
       if (card) {
         const cEl = this.buildCardElement(card, this.isSelected({ zone: "foundation", pile: index, index: pile.length - 1 }));
         cEl.addEventListener("click", () => this.select({ zone: "foundation", pile: index, index: pile.length - 1 }));
-        cEl.addEventListener("pointerdown", (e) => this.startDrag(e, { zone: "foundation", pile: index, index: pile.length - 1 }, cEl));
+        cEl.addEventListener("pointerdown", (e) => this.initiatePendingDrag(e, { zone: "foundation", pile: index, index: pile.length - 1 }, cEl));
         fEl.appendChild(cEl);
       } else {
         const empty = document.createElement("div");
@@ -623,7 +688,7 @@ export class SolitaireRenderer {
             this.autoFoundation({ zone: "tableau", pile: pileIndex, index: cardIndex });
           });
           cEl.addEventListener("pointerdown", (e) => {
-            this.startDrag(e, { zone: "tableau", pile: pileIndex, index: cardIndex }, cEl);
+            this.initiatePendingDrag(e, { zone: "tableau", pile: pileIndex, index: cardIndex }, cEl);
           });
 
           pileEl.appendChild(cEl);

@@ -457,7 +457,7 @@ export class Game2048Renderer {
 
         <div class="game-2048__controls">
           <button class="btn btn--secondary" id="btn-2048-undo" ${this.history.canUndo() ? "" : "disabled"}>Undo</button>
-          <button class="btn btn--secondary" id="btn-2048-redo" ${this.history.canRedo() ? "" : "disabled"}>Redo</button>
+          <button class="btn btn--secondary btn--compact" id="btn-2048-redo" ${this.history.canRedo() ? "" : "disabled"} title="Redo (Ctrl+Shift+Z or Ctrl+Y)">↻</button>
           <button class="btn btn--secondary" id="btn-2048-restart">New Game</button>
           <a class="btn btn--secondary" href="#/">Back to Home</a>
         </div>

@@ -92,9 +92,8 @@ export function renderSettingsScreen(container: HTMLElement): void {
     </section>
 
     <div class="settings-actions">
-      <button class="btn btn--secondary" id="btn-export-errors" style="margin-right: 8px;">Report Bug</button>
-      <button class="btn btn--secondary" id="btn-export-performance" style="margin-right: 8px;">Performance Report</button>
-      <a class="btn btn--secondary" href="#/">Back to Home</a>
+      <button class="btn btn--secondary" id="btn-export-errors">Report Bug</button>
+      <button class="btn btn--secondary" id="btn-export-performance">Performance Report</button>
     </div>
   `;
 

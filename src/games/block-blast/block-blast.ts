@@ -282,22 +282,46 @@ export class BlockBlastRenderer {
     const anchorOffsetRow = Math.min(maxRow, Math.max(minRow, Math.round(offsetY / miniSize - 0.5)));
     const board = this.container?.querySelector("#bb-board") as HTMLElement | null;
     const boardCell = board?.querySelector<HTMLElement>(".block-blast__cell");
+    const boardCellSize = boardCell?.getBoundingClientRect().height ?? 34;
     const liftY = e.pointerType === "mouse"
       ? 0
-      : Math.round((boardCell?.getBoundingClientRect().height ?? 34) * 3.5);
+      : Math.round(boardCellSize * 1.5);
 
-    // Create a shape-only ghost so the tray card remains intact.
+    // Create a shape-only ghost rendered at board cell size
     const ghost = document.createElement("div");
     ghost.className = "block-blast__drag-ghost";
-    ghost.innerHTML = this.renderShape(shape);
     ghost.style.position = "fixed";
     ghost.style.left = `${rect.left}px`;
     ghost.style.top = `${rect.top - liftY}px`;
     ghost.style.pointerEvents = "none";
     ghost.style.zIndex = "9999";
     ghost.style.opacity = "0.9";
-    ghost.style.transform = "scale(1.15)";
     ghost.style.transition = "none";
+
+    // Render shape at board cell size
+    const shapeGrid = document.createElement("div");
+    shapeGrid.className = "block-blast__shape";
+    shapeGrid.style.display = "grid";
+    shapeGrid.style.gridTemplateColumns = `repeat(${maxCol + 1}, ${boardCellSize}px)`;
+    shapeGrid.style.gridAutoRows = `${boardCellSize}px`;
+    shapeGrid.style.gap = "4px";
+
+    for (let r = minRow; r <= maxRow; r++) {
+      for (let c = minCol; c <= maxCol; c++) {
+        const filled = shape.cells.some(([sr, sc]) => sr === r && sc === c);
+        const miniCell = document.createElement("div");
+        miniCell.className = filled ? "block-blast__mini" : "block-blast__mini--empty";
+        if (filled) {
+          miniCell.style.background = shape.color;
+          miniCell.style.width = `${boardCellSize}px`;
+          miniCell.style.height = `${boardCellSize}px`;
+          miniCell.style.borderRadius = "5px";
+          miniCell.style.border = "1px solid rgba(75, 48, 53, 0.28)";
+        }
+        shapeGrid.appendChild(miniCell);
+      }
+    }
+    ghost.appendChild(shapeGrid);
     document.body.appendChild(ghost);
 
     this.drag = { shapeIndex, ghost, offsetX, offsetY, anchorOffsetRow, anchorOffsetCol, liftY };

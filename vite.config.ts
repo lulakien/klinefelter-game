@@ -39,6 +39,9 @@ export default defineConfig({
           if (id.includes("games/connect-four/")) {
             return "game-connect-four";
           }
+          if (id.includes("games/15-puzzle/")) {
+            return "game-15-puzzle";
+          }
         },
       },
     },
